@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クッキークリッカー風ゲーム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+        }
+        
+        .game-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 900px;
+            width: 90%;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 36px;
+        }
+        
+        .game-area {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+        
+        .left-panel {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .right-panel {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .stats {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 18px;
+        }
+        
+        .stat-label {
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .stat-value {
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .cookie-button {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #f5deb3, #daa520);
+            border: 5px solid #8b6914;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 80px;
+            margin: 30px auto;
+            transition: transform 0.1s, box-shadow 0.1s;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        
+        .cookie-button:hover {
+            transform: scale(1.05);
+        }
+        
+        .cookie-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .click-animation {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            animation: floatUp 1s ease-out forwards;
+            pointer-events: none;
+        }
+        
+        @keyframes floatUp {
+            0% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-100px);
+            }
+        }
+        
+        .upgrades {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .upgrades h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+        
+        .upgrade-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .upgrade-item:hover {
+            border-color: #667eea;
+            transform: translateX(5px);
+        }
+        
+        .upgrade-item.affordable {
+            border-color: #4caf50;
+            background: #f1f8f4;
+        }
+        
+        .upgrade-item.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .upgrade-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .upgrade-name {
+            font-weight: bold;
+            font-size: 18px;
+            color: #333;
+        }
+        
+        .upgrade-count {
+            background: #667eea;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 14px;
+        }
+        
+        .upgrade-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .upgrade-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+            width: 100%;
+            transition: background 0.3s;
+            font-weight: bold;
+        }
+        
+        .upgrade-button:hover:not(:disabled) {
+            background: #5568d3;
+        }
+        
+        .upgrade-button:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+        
+        .upgrade-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .achievements {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 2px solid #ffc107;
+        }
+        
+        .achievements h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .achievement-item {
+            background: white;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .achievement-unlocked {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .reset-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .reset-button:hover {
+            background: #c82333;
+        }
+
+        .game-over-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .game-over-overlay.show {
+            display: flex;
+        }
+
+        .game-over-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            animation: explosionShake 0.5s;
+        }
+
+        @keyframes explosionShake {
+            0%, 100% { transform: translate(0, 0); }
+            10% { transform: translate(-10px, -10px); }
+            20% { transform: translate(10px, 10px); }
+            30% { transform: translate(-10px, 10px); }
+            40% { transform: translate(10px, -10px); }
+            50% { transform: translate(-10px, -10px); }
+            60% { transform: translate(10px, 10px); }
+            70% { transform: translate(-10px, 10px); }
+            80% { transform: translate(10px, -10px); }
+            90% { transform: translate(-10px, -10px); }
+        }
+
+        .game-over-box h2 {
+            font-size: 48px;
+            color: #dc3545;
+            margin-bottom: 20px;
+        }
+
+        .game-over-box p {
+            font-size: 24px;
+            margin: 15px 0;
+            color: #333;
+        }
+
+        .game-over-box button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+
+        .game-over-box button:hover {
+            background: #5568d3;
+        }
+
+        .cookie-button.bomb {
+            background: linear-gradient(145deg, #333, #000);
+            animation: bombPulse 0.5s infinite;
+        }
+
+        @keyframes bombPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .cookie-button.poison {
+            background: linear-gradient(145deg, #9c27b0, #4a148c);
+            animation: poisonPulse 0.8s infinite;
+        }
+
+        @keyframes poisonPulse {
+            0%, 100% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.05); filter: brightness(1.3); }
+        }
+
+        .cookie-button.happy {
+            background: linear-gradient(145deg, #ffd700, #ff6b00);
+            animation: happySparkle 0.6s infinite;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+        }
+
+        @keyframes happySparkle {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            25% { transform: scale(1.1) rotate(-5deg); }
+            75% { transform: scale(1.1) rotate(5deg); }
+        }
+
+        .warning-text {
+            color: #dc3545;
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 10px;
+            animation: warningBlink 0.5s infinite;
+        }
+
+        .warning-text.poison {
+            color: #9c27b0;
+        }
+
+        .warning-text.happy {
+            color: #ffd700;
+            animation: happyBlink 0.5s infinite;
+        }
+
+        @keyframes warningBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        @keyframes happyBlink {
+            0%, 100% { opacity: 1; text-shadow: 0 0 10px #ffd700; }
+            50% { opacity: 0.7; text-shadow: 0 0 20px #ffd700; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🍢 おでんクリッカー 🍢</h1>
+        
+        <div class="game-area">
+            <div class="left-panel">
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">おでん:</span>
+                        <span class="stat-value" id="cookies">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">1クリック:</span>
+                        <span class="stat-value" id="clickPower">1</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">毎秒:</span>
+                        <span class="stat-value" id="cps">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">総生産:</span>
+                        <span class="stat-value" id="total">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">クリック数:</span>
+                        <span class="stat-value" id="clicks">0</span>
+                    </div>
+                </div>
+                
+                <div class="cookie-button" id="cookieBtn">
+                    🍢
+                </div>
+                <div id="warningText" style="text-align: center; min-height: 30px;"></div>
+                
+                <div class="achievements">
+                    <h3>🏆 実績</h3>
+                    <div id="achievementsList">まだ実績がありません</div>
+                    <button class="reset-button" id="resetBtn">ゲームをリセット</button>
+                </div>
+            </div>
+            
+            <div class="right-panel">
+                <div class="upgrades">
+                    <h2>アップグレード</h2>
+                    <div id="upgradesList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ゲームオーバー画面 -->
+    <div class="game-over-overlay" id="gameOverOverlay">
+        <div class="game-over-box">
+            <h2>💥 ゲームオーバー 💥</h2>
+            <p>爆弾おでんを食べてしまった！</p>
+            <p id="finalScore"></p>
+            <button id="restartBtn">もう一度プレイ</button>
+        </div>
+    </div>
+
+    <script>
+        // ゲームデータ
+        let gameData = {
+            cookies: 0,
+            totalCookies: 0,
+            clicks: 0,
+            cookiesPerClick: 1,
+            cookiesPerSecond: 0,
+            isBomb: false,
+            isPoison: false,
+            isHappy: false,
+            gameOver: false,
+            poisonUnlocked: false,
+            poisonRateBonus: 0,
+            happyRateBonus: 0,
+            upgrades: [
+    {
+        id: 'cursor',
+        name: 'お箸',
+        baseCost: 15,
+        cost: 15,
+        owned: 0,
+        cps: 0.1,
+        emoji: '🥢',
+        type: 'passive',
+        desc: 'おでんを自動で少しずつ増やします。（+0.1 / 秒）'
+    },
+    {
+        id: 'grandma',
+        name: 'おでん屋台',
+        baseCost: 100,
+        cost: 100,
+        owned: 0,
+        cps: 1,
+        emoji: '🏮',
+        type: 'passive',
+        desc: '屋台が毎秒おでんを作ります。（+1 / 秒）'
+    },
+    {
+        id: 'farm',
+        name: '大根畑',
+        baseCost: 500,
+        cost: 500,
+        owned: 0,
+        cps: 8,
+        emoji: '🌾',
+        type: 'passive',
+        desc: '畑で大量の大根を生産します。（+8 / 秒）'
+    },
+    {
+        id: 'factory',
+        name: 'おでん工場',
+        baseCost: 3000,
+        cost: 3000,
+        owned: 0,
+        cps: 47,
+        emoji: '🏭',
+        type: 'passive',
+        desc: '工場が効率的におでんを大量生産。（+47 / 秒）'
+    },
+    {
+        id: 'bank',
+        name: 'おでんチェーン店',
+        baseCost: 10000,
+        cost: 10000,
+        owned: 0,
+        cps: 260,
+        emoji: '🏪',
+        type: 'passive',
+        desc: 'チェーン店が全国でおでんを販売。（+260 / 秒）'
+    },
+    {
+        id: 'wizard',
+        name: 'おでん魔法使い',
+        baseCost: 40000,
+        cost: 40000,
+        owned: 0,
+        cps: 1400,
+        emoji: '🧙',
+        type: 'passive',
+        desc: '魔法でおでんを錬成します。（+1400 / 秒）'
+    },
+
+    {
+        id: 'clickPower1',
+        name: '強化お箸',
+        baseCost: 50,
+        cost: 50,
+        owned: 0,
+        clickBonus: 1,
+        emoji: '✨',
+        type: 'click',
+        desc: 'クリックで得られるおでんを +1 増加。(クリックで得られるおでんを +1 増加)' 
+    },
+    {
+        id: 'clickPower2',
+        name: '黄金のお箸',
+        baseCost: 500,
+        cost: 500,
+        owned: 0,
+        clickBonus: 5,
+        emoji: '⭐',
+        type: 'click',
+        desc: 'クリックパワーがさらに増加。（+5）'
+    },
+    {
+        id: 'clickPower3',
+        name: 'ダイヤのお箸',
+        baseCost: 5000,
+        cost: 5000,
+        owned: 0,
+        clickBonus: 25,
+        emoji: '💎',
+        type: 'click',
+        desc: '1クリックの獲得量が大きく上昇。（+25）'
+    },
+    {
+        id: 'clickPower4',
+        name: '伝説のお箸',
+        baseCost: 50000,
+        cost: 50000,
+        owned: 0,
+        clickBonus: 100,
+        emoji: '👑',
+        type: 'click',
+        desc: '伝説級のお箸でクリック力大幅アップ。（+100）'
+    },
+
+    {
+        id: 'riskReward1',
+        name: '危険な調味料',
+        baseCost: 1000,
+        cost: 1000,
+        owned: 0,
+        cpsBonus: 0.5,
+        poisonRate: 0.02,
+        emoji: '🌶️',
+        type: 'risk',
+        desc: '生産量+0.5/秒。2%の確率で毒おでん発生。'
+    },
+    {
+        id: 'riskReward2',
+        name: '激辛スパイス',
+        baseCost: 10000,
+        cost: 10000,
+        owned: 0,
+        cpsBonus: 5,
+        poisonRate: 0.03,
+        emoji: '🔥',
+        type: 'risk',
+        desc: '生産量+5/秒。3%の確率で毒おでん発生。'
+    },
+    {
+        id: 'riskReward3',
+        name: '秘伝のタレ',
+        baseCost: 100000,
+        cost: 100000,
+        owned: 0,
+        cpsBonus: 50,
+        poisonRate: 0.05,
+        emoji: '💀',
+        type: 'risk',
+        desc: '生産量+50/秒。5%の確率で毒おでん発生。'
+    },
+
+    {
+        id: 'luckyCharm1',
+        name: '幸運のお守り',
+        baseCost: 2000,
+        cost: 2000,
+        owned: 0,
+        happyRate: 0.01,
+        emoji: '🍀',
+        type: 'lucky',
+        desc: '1%の確率でハッピーおでん出現。獲得量2倍。'
+    },
+    {
+        id: 'luckyCharm2',
+        name: '黄金の招き猫',
+        baseCost: 20000,
+        cost: 20000,
+        owned: 0,
+        happyRate: 0.02,
+        emoji: '🐱',
+        type: 'lucky',
+        desc: 'ハッピーおでんの発生率がさらに上昇。（+2%）'
+    },
+    {
+        id: 'luckyCharm3',
+        name: '四つ葉のクローバー',
+        baseCost: 200000,
+        cost: 200000,
+        owned: 0,
+        happyRate: 0.04,
+        emoji: '🌈',
+        type: 'lucky',
+        desc: 'ハッピーおでん発生率 +4%。超ラッキー状態！'
+    }
+],
+
+achievements: [
+                { id: 'first', name: '最初の一歩', condition: () => gameData.totalCookies >= 1, unlocked: false },
+                { id: 'hundred', name: '100枚達成', condition: () => gameData.totalCookies >= 100, unlocked: false },
+                { id: 'thousand', name: '1000枚達成', condition: () => gameData.totalCookies >= 1000, unlocked: false },
+                { id: 'clicker', name: 'クリックマスター', condition: () => gameData.clicks >= 100, unlocked: false },
+                { id: 'buyer', name: '初めての購入', condition: () => gameData.upgrades.some(u => u.owned > 0), unlocked: false }
+            ]
+        };
+
+        // 要素取得
+        const cookieBtn = document.getElementById('cookieBtn');
+        const cookiesDisplay = document.getElementById('cookies');
+        const clickPowerDisplay = document.getElementById('clickPower');
+        const cpsDisplay = document.getElementById('cps');
+        const totalDisplay = document.getElementById('total');
+        const clicksDisplay = document.getElementById('clicks');
+        const upgradesList = document.getElementById('upgradesList');
+        const achievementsList = document.getElementById('achievementsList');
+        const resetBtn = document.getElementById('resetBtn');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const restartBtn = document.getElementById('restartBtn');
+        const finalScore = document.getElementById('finalScore');
+        const warningText = document.getElementById('warningText');
+
+        // クッキーをクリック
+        cookieBtn.addEventListener('click', (e) => {
+            if (gameData.gameOver) return;
+            
+            // 爆弾だった場合ゲームオーバー
+            if (gameData.isBomb) {
+                triggerGameOver();
+                return;
+            }
+            
+            // 毒おでんだった場合
+            if (gameData.isPoison) {
+                const loss = Math.floor(gameData.cookies * 0.1); // 現在のおでんの10%を失う
+                gameData.cookies = Math.max(0, gameData.cookies - loss);
+                
+                // マイナス表示アニメーション
+                const animation = document.createElement('div');
+                animation.className = 'click-animation';
+                animation.style.color = '#9c27b0';
+                animation.textContent = `-${loss}`;
+                animation.style.left = (Math.random() * 100 - 50) + 'px';
+                cookieBtn.appendChild(animation);
+                
+                setTimeout(() => animation.remove(), 1000);
+                
+                // 毒状態を解除
+                gameData.isPoison = false;
+                cookieBtn.classList.remove('poison');
+                cookieBtn.textContent = '🍢';
+                warningText.innerHTML = '';
+                
+                updateDisplay();
+                return;
+            }
+            
+            // ハッピーおでんの場合は2倍
+            let gain = gameData.cookiesPerClick;
+            if (gameData.isHappy) {
+                gain *= 2;
+                
+                // ハッピー状態を解除
+                gameData.isHappy = false;
+                cookieBtn.classList.remove('happy');
+                cookieBtn.textContent = '🍢';
+                warningText.innerHTML = '';
+            }
+            
+            gameData.cookies += gain;
+            gameData.totalCookies += gain;
+            gameData.clicks++;
+            
+            // クリックアニメーション
+            const animation = document.createElement('div');
+            animation.className = 'click-animation';
+            animation.textContent = `+${gain}`;
+            animation.style.left = (Math.random() * 100 - 50) + 'px';
+            if (gain > gameData.cookiesPerClick) {
+                animation.style.color = '#ffd700';
+                animation.style.fontSize = '32px';
+            }
+            cookieBtn.appendChild(animation);
+            
+            setTimeout(() => animation.remove(), 1000);
+            
+            updateDisplay();
+            checkAchievements();
+        });
+
+        // リセットボタン
+        resetBtn.addEventListener('click', () => {
+            if (confirm('本当にゲームをリセットしますか？すべての進行状況が失われます。')) {
+                resetGameData();
+            }
+        });
+
+        // 再スタートボタン
+        restartBtn.addEventListener('click', () => {
+            gameOverOverlay.classList.remove('show');
+            resetGameData();
+        });
+
+        // アップグレードを購入（グローバル関数として定義）
+        window.buyUpgrade = function(upgradeId) {
+            const upgrade = gameData.upgrades.find(u => u.id === upgradeId);
+            
+            if (gameData.cookies >= upgrade.cost) {
+                gameData.cookies -= upgrade.cost;
+                upgrade.owned++;
+                upgrade.cost = Math.floor(upgrade.baseCost * Math.pow(1.15, upgrade.owned));
+                
+                // リスク系アップグレードの場合
+                if (upgrade.type === 'risk') {
+                    gameData.poisonRateBonus += upgrade.poisonRate;
+                }
+                
+                // 幸運系アップグレードの場合
+                if (upgrade.type === 'lucky') {
+                    gameData.happyRateBonus += upgrade.happyRate;
+                }
+                
+                calculateCPS();
+                calculateClickPower();
+                updateDisplay();
+                renderUpgrades(upgradeDiv.innerHTML = `
+    <div class="upgrade-header">
+        <span class="upgrade-name">${u.emoji} ${u.name}</span>
+        <span class="upgrade-count">x ${u.owned}</span>
+    </div>
+    <div class="upgrade-info">
+        <span>${u.desc}</span>
+        <span>💰 ${u.cost}</span>
+    </div>
+    <button class="upgrade-button" onclick="buyUpgrade('${u.id}')" 
+        ${gameData.cookies < u.cost ? 'disabled' : ''}>購入</button>
+`,
+);
+                checkAchievements();
+            }
+        };
+
+        // ゲームをリセット
+        window.resetGame = function() {
+            resetBtn.click();
+        };
+
+        // データリセット関数
+        function resetGameData() {
+                            gameData = {
+                cookies: 0,
+                totalCookies: 0,
+                clicks: 0,
+                cookiesPerClick: 1,
+                cookiesPerSecond: 0,
+                isBomb: false,
+                isPoison: false,
+                isHappy: false,
+                gameOver: false,
+                poisonUnlocked: false,
+                poisonRateBonus: 0,
+                happyRateBonus: 0,
+                upgrades: [
+                    {
+                        id: 'cursor',
+                        name: 'お箸',
+                        baseCost: 15,
+                        cost: 15,
+                        owned: 0,
+                        cps: 0.1,
+                        emoji: '🥢',
+                        type: 'passive'
+                    },
+                    {
+                        id: 'grandma',
+                        name: 'おでん屋台',
+                        baseCost: 100,
+                        cost: 100,
+                        owned: 0,
+                        cps: 1,
+                        emoji: '🏮',
+                        type: 'passive'
+                    },
+                    {
+                        id: 'farm',
+                        name: '大根畑',
+                        baseCost: 500,
+                        cost: 500,
+                        owned: 0,
+                        cps: 8,
+                        emoji: '🌾',
+                        type: 'passive'
+                    },
+                    {
+                        id: 'factory',
+                        name: 'おでん工場',
+                        baseCost: 3000,
+                        cost: 3000,
+                        owned: 0,
+                        cps: 47,
+                        emoji: '🏭',
+                        type: 'passive'
+                    },
+                    {
+                        id: 'bank',
+                        name: 'おでんチェーン店',
+                        baseCost: 10000,
+                        cost: 10000,
+                        owned: 0,
+                        cps: 260,
+                        emoji: '🏪',
+                        type: 'passive'
+                    },
+                    {
+                        id: 'wizard',
+                        name: 'おでん魔法使い',
+                        baseCost: 40000,
+                        cost: 40000,
+                        owned: 0,
+                        cps: 1400,
+                        emoji: '🧙',
+                        type: 'passive'
+                    },
+                    {
+                        id: 'clickPower1',
+                        name: '強化お箸',
+                        baseCost: 50,
+                        cost: 50,
+                        owned: 0,
+                        clickBonus: 1,
+                        emoji: '✨',
+                        type: 'click'
+                    },
+                    {
+                        id: 'clickPower2',
+                        name: '黄金のお箸',
+                        baseCost: 500,
+                        cost: 500,
+                        owned: 0,
+                        clickBonus: 5,
+                        emoji: '⭐',
+                        type: 'click'
+                    },
+                    {
+                        id: 'clickPower3',
+                        name: 'ダイヤのお箸',
+                        baseCost: 5000,
+                        cost: 5000,
+                        owned: 0,
+                        clickBonus: 25,
+                        emoji: '💎',
+                        type: 'click'
+                    },
+                    {
+                        id: 'clickPower4',
+                        name: '伝説のお箸',
+                        baseCost: 50000,
+                        cost: 50000,
+                        owned: 0,
+                        clickBonus: 100,
+                        emoji: '👑',
+                        type: 'click'
+                    },
+                    {
+                        id: 'riskReward1',
+                        name: '危険な調味料',
+                        baseCost: 1000,
+                        cost: 1000,
+                        owned: 0,
+                        cpsBonus: 0.5,
+                        poisonRate: 0.02,
+                        emoji: '🌶️',
+                        type: 'risk'
+                    },
+                    {
+                        id: 'riskReward2',
+                        name: '激辛スパイス',
+                        baseCost: 10000,
+                        cost: 10000,
+                        owned: 0,
+                        cpsBonus: 5,
+                        poisonRate: 0.03,
+                        emoji: '🔥',
+                        type: 'risk'
+                    },
+                    {
+                        id: 'riskReward3',
+                        name: '秘伝のタレ',
+                        baseCost: 100000,
+                        cost: 100000,
+                        owned: 0,
+                        cpsBonus: 50,
+                        poisonRate: 0.05,
+                        emoji: '💀',
+                        type: 'risk'
+                    },
+                    {
+                        id: 'luckyCharm1',
+                        name: '幸運のお守り',
+                        baseCost: 2000,
+                        cost: 2000,
+                        owned: 0,
+                        happyRate: 0.01,
+                        emoji: '🍀',
+                        type: 'lucky'
+                    },
+                    {
+                        id: 'luckyCharm2',
+                        name: '黄金の招き猫',
+                        baseCost: 20000,
+                        cost: 20000,
+                        owned: 0,
+                        happyRate: 0.02,
+                        emoji: '🐱',
+                        type: 'lucky'
+                    },
+                    {
+                        id: 'luckyCharm3',
+                        name: '四つ葉のクローバー',
+                        baseCost: 200000,
+                        cost: 200000,
+                        owned: 0,
+                        happyRate: 0.04,
+                        emoji: '🌈',
+                        type: 'lucky'
+                    }
+                ],
+                achievements: [
+                    { id: 'first', name: '最初の一歩', condition: () => gameData.totalCookies >= 1, unlocked: false },
+                    { id: 'hundred', name: '100枚達成', condition: () => gameData.totalCookies >= 100, unlocked: false },
+                    { id: 'thousand', name: '1000枚達成', condition: () => gameData.totalCookies >= 1000, unlocked: false },
+                    { id: 'clicker', name: 'クリックマスター', condition: () => gameData.clicks >= 100, unlocked: false },
+                    { id: 'buyer', name: '初めての購入', condition: () => gameData.upgrades.some(u => u.owned > 0), unlocked: false }
+                ]
+            };
+            
+            localStorage.removeItem('cookieGameData');
+            cookieBtn.classList.remove('bomb', 'poison', 'happy');
+            cookieBtn.textContent = '🍢';
+            warningText.innerHTML = '';
+            
+            calculateCPS();
+            calculateClickPower();
+            updateDisplay();
+            renderUpgrades();
+            renderAchievements();
+        }
+
+        // ゲームオーバー処理
+        function triggerGameOver() {
+            gameData.gameOver = true;
+            finalScore.textContent = `最終スコア: ${Math.floor(gameData.totalCookies).toLocaleString()} おでん`;
+            gameOverOverlay.classList.add('show');
+        }
+
+        // 爆弾化処理
+        function makeBomb() {
+            if (gameData.gameOver || gameData.isBomb || gameData.isPoison || gameData.isHappy) return;
+            
+            gameData.isBomb = true;
+            cookieBtn.classList.add('bomb');
+            cookieBtn.textContent = '💣';
+            warningText.innerHTML = '<span class="warning-text">⚠️ 危険！爆弾おでん！クリックしないで！ ⚠️</span>';
+            
+            // 3〜5秒後に解除
+            const duration = 3000 + Math.random() * 2000;
+            setTimeout(() => {
+                if (!gameData.gameOver && gameData.isBomb) {
+                    gameData.isBomb = false;
+                    cookieBtn.classList.remove('bomb');
+                    cookieBtn.textContent = '🍢';
+                    warningText.innerHTML = '';
+                }
+            }, duration);
+        }
+
+        // 毒おでん化処理
+        function makePoison() {
+            // 毒おでんがアンロックされていない場合は出現しない
+            if (!gameData.poisonUnlocked) return;
+            if (gameData.gameOver || gameData.isBomb || gameData.isPoison || gameData.isHappy) return;
+            
+            gameData.isPoison = true;
+            cookieBtn.classList.add('poison');
+            cookieBtn.textContent = '☠️';
+            warningText.innerHTML = '<span class="warning-text poison">⚠️ 毒おでん！クリックするとおでんが減る！ ⚠️</span>';
+            
+            // 4〜6秒後に解除
+            const duration = 4000 + Math.random() * 2000;
+            setTimeout(() => {
+                if (!gameData.gameOver && gameData.isPoison) {
+                    gameData.isPoison = false;
+                    cookieBtn.classList.remove('poison');
+                    cookieBtn.textContent = '🍢';
+                    warningText.innerHTML = '';
+                }
+            }, duration);
+        }
+
+        // ハッピーおでん化処理
+        function makeHappy() {
+            if (gameData.gameOver || gameData.isBomb || gameData.isPoison || gameData.isHappy) return;
+            
+            gameData.isHappy = true;
+            cookieBtn.classList.add('happy');
+            cookieBtn.textContent = '🌟';
+            warningText.innerHTML = '<span class="warning-text happy">✨ ラッキー！獲得量2倍！ ✨</span>';
+            
+            // 5〜7秒後に解除
+            const duration = 5000 + Math.random() * 2000;
+            setTimeout(() => {
+                if (!gameData.gameOver && gameData.isHappy) {
+                    gameData.isHappy = false;
+                    cookieBtn.classList.remove('happy');
+                    cookieBtn.textContent = '🍢';
+                    warningText.innerHTML = '';
+                }
+            }, duration);
+        }
+
+        // ランダムイベントを発生させる
+        function startEventTimer() {
+            setInterval(() => {
+                if (gameData.gameOver || gameData.isBomb || gameData.isPoison || gameData.isHappy) return;
+                
+                const rand = Math.random();
+                
+                // 基本確率
+                const bombRate = 0.015; // 1.5%
+                const basePoisonRate = 0.01; // 1%（下げました）
+                const baseHappyRate = 0.02; // 2%
+                
+                // ボーナスを加算
+                const totalPoisonRate = basePoisonRate + gameData.poisonRateBonus;
+                const totalHappyRate = baseHappyRate + gameData.happyRateBonus;
+                
+                // 爆弾
+                if (rand < bombRate) {
+                    makeBomb();
+                }
+                // 毒おでん（アンロック済みの場合のみ）
+                else if (gameData.poisonUnlocked && rand < bombRate + totalPoisonRate) {
+                    makePoison();
+                }
+                // ハッピーおでん
+                else if (rand < bombRate + totalPoisonRate + totalHappyRate) {
+                    makeHappy();
+                }
+            }, 1000);
+        }
+
+        // 毎秒のクッキー生産量を計算
+        function calculateCPS() {
+            gameData.cookiesPerSecond = 0;
+            let baseCPS = 0;
+            
+            // 基本の自動生産を計算
+            gameData.upgrades.forEach(upgrade => {
+                if (upgrade.type === 'passive') {
+                    baseCPS += upgrade.cps * upgrade.owned;
+                }
+            });
+            
+            gameData.cookiesPerSecond = baseCPS;
+            
+            // リスク系アップグレードのボーナスを適用
+            gameData.upgrades.forEach(upgrade => {
+                if (upgrade.type === 'risk' && upgrade.owned > 0) {
+                    gameData.cookiesPerSecond += upgrade.cpsBonus * upgrade.owned * (baseCPS > 0 ? baseCPS : 1);
+                }
+            });
+        }
+
+        // クリック力を計算
+        function calculateClickPower() {
+            gameData.cookiesPerClick = 1;
+            gameData.upgrades.forEach(upgrade => {
+                if (upgrade.type === 'click') {
+                    gameData.cookiesPerClick += upgrade.clickBonus * upgrade.owned;
+                }
+            });
+        }
+
+        // 表示を更新
+        function updateDisplay() {
+            cookiesDisplay.textContent = Math.floor(gameData.cookies).toLocaleString();
+            clickPowerDisplay.textContent = gameData.cookiesPerClick.toLocaleString();
+            cpsDisplay.textContent = gameData.cookiesPerSecond.toFixed(1);
+            totalDisplay.textContent = Math.floor(gameData.totalCookies).toLocaleString();
+            clicksDisplay.textContent = gameData.clicks.toLocaleString();
+            
+            // 毒おでんのアンロックチェック
+            if (!gameData.poisonUnlocked && gameData.totalCookies >= 500) {
+                gameData.poisonUnlocked = true;
+            }
+        }
+
+        // アップグレードリストを描画
+        function renderUpgrades() {
+            upgradesList.innerHTML = '';
+            
+            gameData.upgrades.forEach(upgrade => {
+                const canAfford = gameData.cookies >= upgrade.cost;
+                
+                const upgradeDiv = document.createElement('div');
+                upgradeDiv.className = `upgrade-item ${canAfford ? 'affordable' : 'locked'}`;
+                
+                upgradeDiv.innerHTML = `
+                    <div class="upgrade-header">
+                        <span class="upgrade-name">${upgrade.emoji} ${upgrade.name}</span>
+                        <span class="upgrade-count">${upgrade.owned}</span>
+                    </div>
+                    <div class="upgrade-info">
+                        <span>+${upgrade.cps}/秒</span>
+                        <span>💰 ${upgrade.cost.toLocaleString()}</span>
+                    </div>
+                    <button class="upgrade-button" ${!canAfford ? 'disabled' : ''} onclick="buyUpgrade('${upgrade.id}')">
+                        ${canAfford ? '購入する' : 'クッキーが不足'}
+                    </button>
+                `;
+                
+                upgradesList.appendChild(upgradeDiv);
+            });
+        }
+
+        // 実績をチェック
+        function checkAchievements() {
+            let newUnlock = false;
+            
+            gameData.achievements.forEach(achievement => {
+                if (!achievement.unlocked && achievement.condition()) {
+                    achievement.unlocked = true;
+                    newUnlock = true;
+                }
+            });
+            
+            if (newUnlock) renderAchievements();
+        }
+
+        // 実績リストを描画
+        function renderAchievements() {
+            const unlockedAchievements = gameData.achievements.filter(a => a.unlocked);
+            
+            if (unlockedAchievements.length === 0) {
+                achievementsList.innerHTML = 'まだ実績がありません';
+                return;
+            }
+            
+            achievementsList.innerHTML = '';
+            
+            unlockedAchievements.forEach(achievement => {
+                const achDiv = document.createElement('div');
+                achDiv.className = 'achievement-item achievement-unlocked';
+                achDiv.textContent = `✓ ${achievement.name}`;
+                achievementsList.appendChild(achDiv);
+            });
+        }
+
+        // 毎秒クッキーを生産
+        setInterval(() => {
+            if (gameData.cookiesPerSecond > 0) {
+                const gain = gameData.cookiesPerSecond / 10;
+                gameData.cookies += gain;
+                gameData.totalCookies += gain;
+                updateDisplay();
+            }
+        }, 100);
+
+        // 定期的にアップグレードリストを更新（購入可能状態の表示を更新）
+        setInterval(() => {
+            renderUpgrades();
+        }, 500);
+
+        // 自動保存
+        setInterval(() => {
+            localStorage.setItem('cookieGameData', JSON.stringify(gameData));
+        }, 5000);
+
+        // ゲーム読み込み
+        function loadGame() {
+            const saved = localStorage.getItem('cookieGameData');
+            if (saved) {
+                try {
+                    const loaded = JSON.parse(saved);
+                    // データをマージ
+                    gameData.cookies = loaded.cookies || 0;
+                    gameData.totalCookies = loaded.totalCookies || 0;
+                    gameData.clicks = loaded.clicks || 0;
+                    gameData.cookiesPerClick = loaded.cookiesPerClick || 1;
+                    
+                    // アップグレードデータを復元
+                    if (loaded.upgrades) {
+                        loaded.upgrades.forEach((savedUpgrade, index) => {
+                            if (gameData.upgrades[index]) {
+                                gameData.upgrades[index].owned = savedUpgrade.owned || 0;
+                                gameData.upgrades[index].cost = savedUpgrade.cost || gameData.upgrades[index].baseCost;
+                            }
+                        });
+                    }
+                    
+                    // 毒・ハッピーボーナスを復元
+                    gameData.poisonUnlocked = loaded.poisonUnlocked || false;
+                    gameData.poisonRateBonus = loaded.poisonRateBonus || 0;
+                    gameData.happyRateBonus = loaded.happyRateBonus || 0;
+                    
+                    // 実績データを復元
+                    if (loaded.achievements) {
+                        loaded.achievements.forEach((savedAch, index) => {
+                            if (gameData.achievements[index]) {
+                                gameData.achievements[index].unlocked = savedAch.unlocked || false;
+                            }
+                        });
+                    }
+                    
+                    calculateCPS();
+                } catch (e) {
+                    console.error('セーブデータの読み込みに失敗しました', e);
+                }
+            }
+            calculateClickPower();
+            updateDisplay();
+            renderUpgrades();
+            renderAchievements();
+        }
+
+        // 初期化
+        loadGame();
+        startEventTimer();
+    </script>
+</body>
+</html>
