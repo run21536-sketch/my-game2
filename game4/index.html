@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T大付属S高校 面接官ゲーム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #2d2d2d;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        #game-container {
+            background: #1a1a1a;
+            border: 4px solid #444;
+            padding: 20px;
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        #header {
+            text-align: center;
+            padding: 10px;
+            background: #333;
+            border: 2px solid #555;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 22px;
+            color: #6b9bff;
+            text-shadow: 2px 2px #000;
+        }
+        
+        #stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        #main-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        #student-area, #document-area {
+            background: #252525;
+            border: 2px solid #444;
+            padding: 15px;
+            min-height: 300px;
+        }
+        
+        #student-sprite {
+            width: 120px;
+            height: 120px;
+            margin: 20px auto;
+            background: #444;
+            border: 2px solid #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+        }
+        
+        #student-info {
+            margin-top: 15px;
+            line-height: 1.8;
+        }
+        
+        #document {
+            background: #f0f0f0;
+            color: #000;
+            padding: 15px;
+            border: 2px solid #999;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        
+        .doc-header {
+            text-align: center;
+            font-weight: bold;
+            border-bottom: 2px solid #000;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .doc-field {
+            margin: 8px 0;
+        }
+        
+        .doc-label {
+            font-weight: bold;
+            display: inline-block;
+            width: 100px;
+        }
+        
+        #question-area {
+            background: #252525;
+            border: 2px solid #444;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        #questions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        button {
+            background: #4a4a4a;
+            color: #fff;
+            border: 2px solid #666;
+            padding: 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #5a5a5a;
+            border-color: #888;
+        }
+        
+        button:active {
+            background: #3a3a3a;
+        }
+        
+        #decision-area {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        
+        #pass-btn {
+            background: #2d862d;
+            border-color: #4a4;
+            flex: 1;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        #pass-btn:hover {
+            background: #3da63d;
+        }
+        
+        #fail-btn {
+            background: #862d2d;
+            border-color: #a44;
+            flex: 1;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        #fail-btn:hover {
+            background: #a63d3d;
+        }
+        
+        #response {
+            margin-top: 15px;
+            padding: 10px;
+            background: #333;
+            border: 2px solid #555;
+            text-align: center;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .correct {
+            color: #4f4;
+        }
+        
+        .incorrect {
+            color: #f44;
+        }
+        
+        #game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1a1a1a;
+            border: 4px solid #6b9bff;
+            padding: 40px;
+            text-align: center;
+            z-index: 1000;
+        }
+        
+        #game-over h2 {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+        
+        #restart-btn {
+            margin-top: 20px;
+            padding: 15px 30px;
+            font-size: 16px;
+            background: #6b9bff;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="header">
+            <h1>🎓 T大付属S高等学校 面接審査 🎓</h1>
+            <div id="stats">
+                <span>受験生: <span id="day">1</span></span>
+                <span>合格: <span id="approved">0</span></span>
+                <span>不合格: <span id="denied">0</span></span>
+                <span>判定精度: <span id="accuracy">100</span>%</span>
+            </div>
+        </div>
+        
+        <div id="main-area">
+            <div id="student-area">
+                <h3>受験生</h3>
+                <div id="student-sprite">🧑‍🎓</div>
+                <div id="student-info">
+                    <div><strong>氏名:</strong> <span id="name">---</span></div>
+                    <div><strong>態度:</strong> <span id="attitude">---</span></div>
+                </div>
+            </div>
+            
+            <div id="document-area">
+                <h3>願書・調査書</h3>
+                <div id="document">
+                    <div class="doc-header">受験願書</div>
+                    <div class="doc-field">
+                        <span class="doc-label">氏名:</span>
+                        <span id="doc-name">---</span>
+                    </div>
+                    <div class="doc-field">
+                        <span class="doc-label">出身中学:</span>
+                        <span id="doc-school">---</span>
+                    </div>
+                    <div class="doc-field">
+                        <span class="doc-label">内申点:</span>
+                        <span id="doc-grade">---</span>
+                    </div>
+                    <div class="doc-field">
+                        <span class="doc-label">欠席日数:</span>
+                        <span id="doc-absence">---</span>
+                    </div>
+                    <div class="doc-field">
+                        <span class="doc-label">部活動:</span>
+                        <span id="doc-club">---</span>
+                    </div>
+                    <div class="doc-field">
+                        <span class="doc-label">志望理由:</span>
+                        <span id="doc-reason">---</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="question-area">
+            <h3>質問する (クリックして質問)</h3>
+            <div id="questions">
+                <button onclick="askQuestion('motivation')">志望動機は?</button>
+                <button onclick="askQuestion('strength')">あなたの長所は?</button>
+                <button onclick="askQuestion('study')">得意科目は?</button>
+                <button onclick="askQuestion('future')">将来の夢は?</button>
+                <button onclick="askQuestion('detail')">もっと詳しく</button>
+                <button onclick="askQuestion('absence')">欠席について</button>
+                <button onclick="askQuestion('club_detail')">部活動の具体例は?</button>
+                <button onclick="askQuestion('why_here')">なぜ本校なのか?</button>
+                <button onclick="askQuestion('last_chance')">最後に言いたいことは?</button>
+            </div>
+            <div id="response"></div>
+        </div>
+        
+        <div id="decision-area">
+            <button id="pass-btn" onclick="makeDecision(true)">✓ 合格</button>
+            <button id="fail-btn" onclick="makeDecision(false)">✗ 不合格</button>
+        </div>
+    </div>
+    
+    <div id="game-over">
+        <h2>面接審査終了</h2>
+        <p id="final-stats"></p>
+        <button id="restart-btn" onclick="location.reload()">再スタート</button>
+    </div>
+    
+    <script>
+        const firstNames = ['田中', '佐藤', '鈴木', '高橋', '伊藤', '渡辺', '山本', '中村', '小林', '加藤'];
+        const lastNames = ['太郎', '花子', '健二', '美咲', '翔太', '愛', '大輔', '結衣', '拓也', '彩'];
+        const schools = ['桜ヶ丘中学校', '青葉台中学校', '緑山中学校', '海風中学校', '光明中学校', '希望中学校'];
+        const clubs = ['サッカー部', '野球部', '吹奏楽部', 'バスケ部', '美術部', '科学部', '帰宅部', 'テニス部'];
+        const reasons = [
+            '大学進学率が高いため',
+            '充実した設備に魅力を感じた',
+            '先輩の話を聞いて憧れた',
+            '家から近いため',
+            '部活動が盛んだから'
+        ];
+        
+        let stats = {
+            day: 1,
+            approved: 0,
+            denied: 0,
+            correct: 0,
+            total: 0
+        };
+        
+        let currentStudent = null;
+        
+        function generateStudent() {
+            const shouldPass = Math.random() > 0.4;
+            const name = `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+            const docName = shouldPass ? name : (Math.random() > 0.7 ? `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}` : name);
+            
+            const school = schools[Math.floor(Math.random() * schools.length)];
+            const club = clubs[Math.floor(Math.random() * clubs.length)];
+            const reason = reasons[Math.floor(Math.random() * reasons.length)];
+            
+            // 内申点: 25-45点 (45点満点)
+            const baseGrade = shouldPass ? Math.floor(Math.random() * 10) + 32 : Math.floor(Math.random() * 15) + 20;
+            const grade = baseGrade;
+            
+            // 欠席日数
+            const absence = shouldPass ? Math.floor(Math.random() * 5) : Math.floor(Math.random() * 30) + 5;
+            
+            const hasNameMismatch = name !== docName;
+            const hasLowGrade = grade < 30;
+            const hasManyAbsences = absence > 15;
+            
+            // 矛盾や沈黙の問題
+            const hasContradiction = !shouldPass && Math.random() > 0.5;
+            const hasSilence = !shouldPass && Math.random() > 0.6;
+            const hasDocMismatch = !shouldPass && Math.random() > 0.5; // 書類との食い違い
+            const hasIrrelevantAnswer = !shouldPass && Math.random() > 0.5; // 質問と関係ない回答
+            
+            const attitude = shouldPass ? 
+                ['礼儀正しい', 'はきはきしている', '落ち着いている'][Math.floor(Math.random() * 3)] :
+                ['緊張している', '視線が合わない', 'もじもじしている'][Math.floor(Math.random() * 3)];
+            
+            currentStudent = {
+                name: name,
+                docName: docName,
+                school: school,
+                grade: grade + '/45',
+                gradeNum: grade,
+                absence: absence + '日',
+                absenceNum: absence,
+                club: club,
+                reason: reason,
+                attitude: attitude,
+                shouldPass: shouldPass && !hasNameMismatch && !hasLowGrade && !hasManyAbsences,
+                hasContradiction: hasContradiction,
+                hasSilence: hasSilence,
+                hasDocMismatch: hasDocMismatch,
+                hasIrrelevantAnswer: hasIrrelevantAnswer,
+                askedQuestions: {},
+                lastQuestion: null,
+                questionCount: 0,
+                nervousness: shouldPass ? 0 : Math.floor(Math.random() * 3) + 2, // 緊張度 0-5
+                issues: []
+            };
+            
+            if (hasNameMismatch) currentStudent.issues.push('名前の不一致');
+            if (hasLowGrade) currentStudent.issues.push('内申点不足');
+            if (hasManyAbsences) currentStudent.issues.push('欠席過多');
+            if (hasContradiction) currentStudent.issues.push('回答に矛盾あり');
+            if (hasSilence) currentStudent.issues.push('長時間の沈黙');
+            if (hasDocMismatch) currentStudent.issues.push('書類との食い違い');
+            if (hasIrrelevantAnswer) currentStudent.issues.push('質問に答えていない');
+            if (!shouldPass && currentStudent.issues.length === 0) {
+                const extraIssues = ['面接態度不良', '志望動機が不明確', '基礎学力不足'];
+                currentStudent.issues.push(extraIssues[Math.floor(Math.random() * extraIssues.length)]);
+            }
+            
+            displayStudent();
+        }
+        
+        function displayStudent() {
+            const sprites = ['👨‍🎓', '👩‍🎓', '🧑‍🎓'];
+            document.getElementById('student-sprite').textContent = sprites[Math.floor(Math.random() * sprites.length)];
+            document.getElementById('name').textContent = currentStudent.name;
+            updateAttitude();
+            
+            document.getElementById('doc-name').textContent = currentStudent.docName;
+            document.getElementById('doc-school').textContent = currentStudent.school;
+            document.getElementById('doc-grade').textContent = currentStudent.grade;
+            document.getElementById('doc-absence').textContent = currentStudent.absence;
+            document.getElementById('doc-club').textContent = currentStudent.club;
+            document.getElementById('doc-reason').textContent = currentStudent.reason;
+            
+            document.getElementById('response').textContent = '';
+        }
+        
+        function updateAttitude() {
+            let attitude = '';
+            
+            if (currentStudent.shouldPass) {
+                // 合格者は質問が進むと落ち着いてくる
+                if (currentStudent.questionCount === 0) {
+                    attitude = 'やや緊張';
+                } else if (currentStudent.questionCount <= 2) {
+                    attitude = '落ち着いてきた';
+                } else {
+                    attitude = 'はきはきしている';
+                }
+            } else {
+                // 不合格者は緊張度によって変化
+                if (currentStudent.nervousness >= 4) {
+                    const states = ['うろたえている', '汗をかいている', '視線が泳いでいる', '手が震えている'];
+                    attitude = states[Math.floor(Math.random() * states.length)];
+                } else if (currentStudent.nervousness >= 2) {
+                    attitude = 'かなり緊張している';
+                } else {
+                    attitude = '落ち着いてきた';
+                }
+            }
+            
+            document.getElementById('attitude').textContent = attitude;
+        }
+        
+        function askQuestion(type) {
+            currentStudent.questionCount++;
+            
+            // 追求質問や厳しい質問で緊張度が上がる
+            const stressfulQuestions = ['detail', 'absence', 'why_here'];
+            if (stressfulQuestions.includes(type) && !currentStudent.shouldPass) {
+                currentStudent.nervousness = Math.min(5, currentStudent.nervousness + 1);
+            }
+            
+            // 同じ質問を繰り返すと不合格者はさらに緊張
+            if (currentStudent.askedQuestions[type] && !currentStudent.shouldPass) {
+                currentStudent.nervousness = Math.min(5, currentStudent.nervousness + 1);
+            }
+            
+            // 質問を重ねると合格者は落ち着き、不合格者は緊張が少し和らぐこともある
+            if (currentStudent.questionCount > 3) {
+                if (currentStudent.shouldPass) {
+                    currentStudent.nervousness = 0;
+                } else if (currentStudent.nervousness > 2 && Math.random() > 0.7) {
+                    currentStudent.nervousness = Math.max(1, currentStudent.nervousness - 1);
+                }
+            }
+            
+            updateAttitude(); // 態度を更新
+            
+            // 「もっと詳しく」は直前の質問を深堀り
+            if (type === 'detail') {
+                if (!currentStudent.lastQuestion) {
+                    document.getElementById('response').textContent = '「何についてでしょうか...？」';
+                    return;
+                }
+                
+                if (currentStudent.shouldPass) {
+                    const detailResponses = {
+                        motivation: `「具体的には、貴校の図書館の蔵書数が魅力的でした。また、先輩から聞いた先生方の熱心な指導にも惹かれました。」`,
+                        strength: `「例えば、部活動で後輩の指導を任された時、個々の特性を見極めて声をかけることで、チーム全体のレベルアップに貢献できました。」`,
+                        study: `「特に、数学の証明問題に取り組むのが好きです。一つの問題を様々な角度から考察し、最適な解法を見つける過程が楽しいです。」`,
+                        future: `「研究者として、環境問題の解決に貢献したいと考えています。そのために、まずは基礎科学をしっかり学びたいです。」`
+                    };
+                    document.getElementById('response').textContent = detailResponses[currentStudent.lastQuestion] || '「先ほどお答えした通り、それが全てです。」';
+                } else {
+                    // 緊張度によって回答が変わる
+                    if (currentStudent.nervousness >= 4) {
+                        const panicResponses = [
+                            '「あ、えっと...（長い沈黙）...すみません、頭が真っ白で...」',
+                            '「ど、どう答えれば...わかりません...」',
+                            '「（汗を拭きながら）...も、申し訳ありません...」'
+                        ];
+                        document.getElementById('response').textContent = panicResponses[Math.floor(Math.random() * panicResponses.length)];
+                    } else {
+                        const weakResponses = [
+                            '「えっと...それ以上は...特にないです。」',
+                            '「...詳しくと言われても...どう答えればいいか...」',
+                            '「具体的には...よく覚えていません。」'
+                        ];
+                        document.getElementById('response').textContent = weakResponses[Math.floor(Math.random() * weakResponses.length)];
+                    }
+                }
+                return;
+            }
+            
+            // 同じ質問を2回目に聞いた場合
+            if (currentStudent.askedQuestions[type]) {
+                if (currentStudent.hasContradiction) {
+                    const contradictions = {
+                        motivation: `「あ、えっと...先ほどと違うんですが...実は親に勧められたからです。」`,
+                        strength: `「さっき何て言いましたっけ...？あ、違った、短所は優柔不断なところです。」`,
+                        study: `「あれ、さっきと違うこと言ってますね...実は全部苦手です。」`,
+                        future: `「...すみません、先ほどとは違いますが、まだ何も考えていません。」`,
+                        absence: `「あれ？最初は風邪って言いましたっけ...実は...」`,
+                        club_detail: `「え、さっきと話が違いますね...実はあまり活動してなくて...」`
+                    };
+                    document.getElementById('response').textContent = contradictions[type] || '「あれ...さっきと違うこと言ってますね...」';
+                    return;
+                } else if (currentStudent.shouldPass) {
+                    // 合格者は落ち着いて同じ回答
+                    document.getElementById('response').textContent = '「先ほどお答えした通りです。（落ち着いた様子）」';
+                    return;
+                } else {
+                    // 不合格者でも矛盾がない場合は焦りながら答える
+                    document.getElementById('response').textContent = '「え、えっと...先ほどと同じで...その...（焦った様子）」';
+                    return;
+                }
+            }
+            
+            currentStudent.askedQuestions[type] = true;
+            currentStudent.lastQuestion = type;
+            
+            // 沈黙がある場合（最初の実質的な質問で発動）
+            if (currentStudent.hasSilence && currentStudent.questionCount === 1) {
+                document.getElementById('response').textContent = '「............（長い沈黙）...すみません、緊張して...」';
+                return;
+            }
+            
+            // 緊張度が高いと回答が不安定に
+            const isNervousResponse = !currentStudent.shouldPass && currentStudent.nervousness >= 4;
+            
+            const responses = {
+                motivation: currentStudent.shouldPass ? 
+                    `「貴校の充実した教育環境で学びたいと強く思いました。特に${currentStudent.club}で培った協調性を活かし、仲間と共に成長したいです。」` :
+                    isNervousResponse ?
+                    `「あ、その...えっと...${currentStudent.reason}で...（声が震えている）」` :
+                    currentStudent.hasIrrelevantAnswer ?
+                    `「趣味は読書です。特にミステリー小説が好きで...」` :
+                    currentStudent.hasContradiction ? 
+                    `「${currentStudent.reason}というのもありますし、進学実績が良いからです。」` :
+                    `「えっと...${currentStudent.reason}...です。」`,
+                strength: currentStudent.shouldPass ?
+                    `「私の長所は最後まで諦めない粘り強さです。${currentStudent.club}の活動でも、困難な場面で仲間を励まし乗り越えてきました。」` :
+                    isNervousResponse ?
+                    `「ちょ、長所...ですか...（手が震えながら）...うまく言えません...」` :
+                    currentStudent.hasContradiction ?
+                    `「協調性があることと...あと、一人で黙々と作業するのが得意です。」` :
+                    `「特に...思いつきません。普通だと思います。」`,
+                study: currentStudent.shouldPass ?
+                    `「数学が得意です。論理的に考えることが好きで、難しい問題に取り組むことにやりがいを感じます。」` :
+                    isNervousResponse ?
+                    `「と、得意...（汗を拭きながら）...えっと、何でしたっけ...」` :
+                    currentStudent.hasIrrelevantAnswer ?
+                    `「家族は両親と妹がいます。とても仲が良くて...」` :
+                    currentStudent.hasContradiction ?
+                    `「理系科目全般が得意です。いや、文系の方が...どっちも普通です。」` :
+                    `「うーん...特にないです。どれも普通くらいです。」`,
+                future: currentStudent.shouldPass ?
+                    `「将来は研究者になりたいです。そのためにT大学に進学し、専門的な知識を身につけたいと考えています。」` :
+                    isNervousResponse ?
+                    `「し、将来...（視線が泳ぐ）...わ、わかりません...」` :
+                    currentStudent.hasContradiction ?
+                    `「医者になりたいです。いや、教師も良いかな...とりあえず大学には行きたいです。」` :
+                    `「まだ決まっていません...とりあえず高校に入りたいです。」`,
+                absence: currentStudent.shouldPass ?
+                    `「風邪で数日休んだだけです。それ以外は皆勤でした。」` :
+                    isNervousResponse ?
+                    `「あ、あの...き、欠席は...（うろたえている）...」` :
+                    currentStudent.hasDocMismatch && currentStudent.absenceNum > 10 ?
+                    `「ほとんど休んでいません。2、3日くらいです。」` :
+                    currentStudent.hasIrrelevantAnswer ?
+                    `「部活動は頑張っていました。毎日練習していて...」` :
+                    currentStudent.hasContradiction ?
+                    `「体調不良で...いや、家庭の事情も...色々ありまして...」` :
+                    `「...特に理由はないです。なんとなく...」`,
+                club_detail: currentStudent.shouldPass ?
+                    `「${currentStudent.club}では副部長を務め、地区大会で準優勝しました。後輩の指導にも力を入れました。」` :
+                    isNervousResponse ?
+                    `「ぶ、部活は...（手で顔を覆う）...あまり...」` :
+                    currentStudent.hasIrrelevantAnswer ?
+                    `「将来の夢は公務員になることです。安定していて...」` :
+                    currentStudent.hasContradiction ?
+                    `「レギュラーで活躍しました。いや、補欠でしたが...頑張りました。」` :
+                    `「そんなに真剣にやってなかったです...」`,
+                why_here: currentStudent.shouldPass ?
+                    `「他校も見学しましたが、貴校の自由な校風と真剣に学ぶ雰囲気のバランスが最も自分に合うと感じました。」` :
+                    isNervousResponse ?
+                    `「な、なぜ...（声が裏返る）...わ、わかりません...」` :
+                    currentStudent.hasIrrelevantAnswer ?
+                    `「中学では数学が得意でした。テストでも良い点を...」` :
+                    currentStudent.hasContradiction ?
+                    `「家から近いからです。あ、でも教育内容も...両方です。」` :
+                    `「親に勧められて...自分では特に...」`,
+                last_chance: currentStudent.shouldPass ?
+                    `「入学できたら、勉強と部活動の両立を通じて、人間的にも成長したいです。ぜひよろしくお願いいたします。」` :
+                    isNervousResponse ?
+                    `「さ、最後に...（涙目）...が、頑張ります...」` :
+                    currentStudent.hasIrrelevantAnswer ?
+                    `「昨日はよく眠れませんでした。緊張して...」` :
+                    `「えっと...頑張ります。以上です。」`
+            };
+            
+            document.getElementById('response').textContent = responses[type] || '「...はい。」';
+        }
+        
+        function makeDecision(pass) {
+            stats.total++;
+            const responseDiv = document.getElementById('response');
+            
+            if (pass) {
+                stats.approved++;
+                if (currentStudent.shouldPass) {
+                    stats.correct++;
+                    responseDiv.innerHTML = '<span class="correct">✓ 正しい判断！優秀な生徒を合格させました。</span>';
+                } else {
+                    responseDiv.innerHTML = `<span class="incorrect">✗ 判定ミス！問題点: ${currentStudent.issues.join(', ')}</span>`;
+                }
+            } else {
+                stats.denied++;
+                if (!currentStudent.shouldPass) {
+                    stats.correct++;
+                    responseDiv.innerHTML = `<span class="correct">✓ 正しい判断！問題を見抜きました。(${currentStudent.issues.join(', ')})</span>`;
+                } else {
+                    responseDiv.innerHTML = '<span class="incorrect">✗ 判定ミス！この生徒は合格基準を満たしていました。</span>';
+                }
+            }
+            
+            updateStats();
+            
+            setTimeout(() => {
+                stats.day++;
+                if (stats.day > 10) {
+                    endGame();
+                } else {
+                    generateStudent();
+                }
+            }, 2500);
+        }
+        
+        function updateStats() {
+            document.getElementById('day').textContent = stats.day;
+            document.getElementById('approved').textContent = stats.approved;
+            document.getElementById('denied').textContent = stats.denied;
+            const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 100;
+            document.getElementById('accuracy').textContent = accuracy;
+        }
+        
+        function endGame() {
+            const accuracy = Math.round((stats.correct / stats.total) * 100);
+            document.getElementById('final-stats').innerHTML = `
+                <p style="font-size: 18px; margin: 20px 0;">
+                    面接人数: ${stats.total}<br>
+                    判定精度: ${accuracy}%<br>
+                    合格: ${stats.approved} / 不合格: ${stats.denied}
+                </p>
+                <p>${accuracy >= 80 ? 'ベテラン面接官です！' : accuracy >= 60 ? 'もう少し慎重に判定を！' : '面接官としての訓練が必要です...'}</p>
+            `;
+            document.getElementById('game-over').style.display = 'block';
+        }
+        
+        // ゲーム開始
+        generateStudent();
+    </script>
+</body>
+</html>
