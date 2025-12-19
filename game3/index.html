@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D テニスゲーム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #d1d5db;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        
+        canvas {
+            border: 4px solid #374151;
+            border-radius: 8px;
+            cursor: crosshair;
+            display: block;
+        }
+        
+        .info {
+            margin-top: 20px;
+            max-width: 600px;
+            text-align: center;
+            color: #9ca3af;
+            font-size: 0.875em;
+            line-height: 1.6;
+        }
+        
+        .info p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>2D テニスゲーム</h1>
+    <p class="subtitle">相手をアウトさせて得点しよう！</p>
+    
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div class="info">
+        <p>• テニスルール: 4ポイントでゲーム、6ゲームでセット、2セット先取で勝利</p>
+        <p>• 白：ミートゾーン（速度1.2倍）赤：端（速度0.9倍）</p>
+        <p>• 速度7以上のボールを打つとラケットにダメージ</p>
+        <p>• HP0時：反応速度5%、ミートゾーン消失、ノックバック</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 音声の設定（オプショナル）
+        const sounds = {};
+        
+        // 音声ファイルを読み込む（エラーがあっても続行）
+        try {
+            sounds.meet = new Audio('sounds/meet.mp3');
+            sounds.normal = new Audio('sounds/normal.mp3');
+            sounds.edge = new Audio('sounds/edge.mp3');
+            sounds.broken = new Audio('sounds/broken.mp3');
+        } catch (e) {
+            console.log('音声ファイルの読み込みに失敗しました（ゲームは続行可能）');
+        }
+        
+        // 音声を再生する関数
+        function playSound(soundName) {
+            const sound = sounds[soundName];
+            if (sound) {
+                sound.currentTime = 0;
+                sound.play().catch(e => {
+                    // エラーは無視（音声なしで続行）
+                });
+            }
+        }
+        
+        // ゲーム状態
+        let gameState = 'ready';
+        let gameScore = {
+            playerPoints: 0,
+            cpuPoints: 0,
+            playerGames: 0,
+            cpuGames: 0,
+            playerSets: 0,
+            cpuSets: 0
+        };
+        
+        const game = {
+            ball: { x: 400, y: 300, vx: 0, vy: 0, radius: 8, speed: 4.8 },
+            playerRacket: { x: 400, y: 480, width: 100, height: 12, hp: 100, maxHp: 100 },
+            cpuRacket: { x: 400, y: 120, width: 100, height: 12, hp: 100, maxHp: 100 },
+            court: { x: 100, y: 50, width: 600, height: 500 },
+            lastHit: null,
+            mousePos: { x: 400, y: 480 },
+            gameStartTime: null,
+            baseSpeedMultiplier: 1.0,
+            nextButton: null
+        };
+        
+        // 描画関数
+        function drawCourt() {
+            const court = game.court;
+            
+            ctx.fillStyle = '#2d5016';
+            ctx.fillRect(court.x, court.y, court.width, court.height);
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(court.x, court.y, court.width, court.height);
+            
+            ctx.beginPath();
+            ctx.moveTo(court.x, court.y + court.height / 2);
+            ctx.lineTo(court.x + court.width, court.y + court.height / 2);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(court.x, court.y + 150);
+            ctx.lineTo(court.x + court.width, court.y + 150);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(court.x, court.y + court.height - 150);
+            ctx.lineTo(court.x + court.width, court.y + court.height - 150);
+            ctx.stroke();
+        }
+        
+        function drawBall() {
+            const ball = game.ball;
+            ctx.fillStyle = '#ffeb3b';
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        
+        function drawRacket(racket, color, isPlayer = false, isCPU = false) {
+            if (!racket) return;
+            
+            ctx.fillStyle = color;
+            ctx.fillRect(racket.x - racket.width / 2, racket.y - racket.height / 2, racket.width, racket.height);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(racket.x - racket.width / 2, racket.y - racket.height / 2, racket.width, racket.height);
+            
+            const isBroken = (isPlayer || isCPU) && racket.hp <= 0;
+            
+            if (!isBroken) {
+                const meetZoneWidth = racket.width * 0.15;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.fillRect(racket.x - meetZoneWidth / 2, racket.y - racket.height / 2, meetZoneWidth, racket.height);
+            }
+            
+            const edgeZoneWidth = racket.width * 0.15;
+            ctx.fillStyle = 'rgba(255, 100, 100, 0.3)';
+            ctx.fillRect(racket.x - racket.width / 2, racket.y - racket.height / 2, edgeZoneWidth, racket.height);
+            ctx.fillRect(racket.x + racket.width / 2 - edgeZoneWidth, racket.y - racket.height / 2, edgeZoneWidth, racket.height);
+            
+            if ((isPlayer || isCPU) && racket.hp !== undefined) {
+                const hpBarWidth = racket.width;
+                const hpBarHeight = 6;
+                const hpBarX = racket.x - hpBarWidth / 2;
+                const hpBarY = isPlayer ? racket.y + racket.height / 2 + 5 : racket.y - racket.height / 2 - 11;
+                
+                ctx.fillStyle = '#000';
+                ctx.fillRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight);
+                
+                const hpPercent = racket.hp / racket.maxHp;
+                const hpColor = hpPercent > 0.5 ? '#4caf50' : hpPercent > 0.25 ? '#ff9800' : '#f44336';
+                ctx.fillStyle = hpColor;
+                ctx.fillRect(hpBarX, hpBarY, hpBarWidth * hpPercent, hpBarHeight);
+                
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight);
+            }
+        }
+        
+        function checkBallRacketCollision(ball, racket) {
+            if (!racket) return false;
+            
+            const ballLeft = ball.x - ball.radius;
+            const ballRight = ball.x + ball.radius;
+            const ballTop = ball.y - ball.radius;
+            const ballBottom = ball.y + ball.radius;
+            
+            const racketLeft = racket.x - racket.width / 2;
+            const racketRight = racket.x + racket.width / 2;
+            const racketTop = racket.y - racket.height / 2;
+            const racketBottom = racket.y + racket.height / 2;
+            
+            return ballRight > racketLeft && ballLeft < racketRight &&
+                   ballBottom > racketTop && ballTop < racketBottom;
+        }
+        
+        function hitBall(ball, racket, isPlayer, isCPU = false) {
+            const offsetX = ball.x - racket.x;
+            const normalizedOffset = offsetX / (racket.width / 2);
+            
+            const isBroken = (isPlayer || isCPU) && racket.hp <= 0;
+            const absOffset = Math.abs(normalizedOffset);
+            
+            let speed, angle;
+            if (!isBroken && absOffset < 0.15) {
+                // ミートゾーン
+                ball.speed = ball.speed * 1.2;
+                speed = ball.speed;
+                angle = normalizedOffset * 0.15;
+                playSound('meet'); // ミート音を再生
+            } else if (absOffset < 0.85) {
+                // 通常ゾーン
+                speed = ball.speed;
+                angle = normalizedOffset * 0.3;
+                playSound('normal'); // 普通の打球音を再生
+            } else {
+                // 端ゾーン
+                ball.speed = ball.speed * 0.9;
+                speed = ball.speed;
+                angle = normalizedOffset * 0.6;
+                playSound('edge'); // 端の打球音を再生
+            }
+            
+            if (isPlayer) {
+                ball.vx = speed * Math.sin(angle);
+                ball.vy = -speed * Math.cos(angle);
+            } else {
+                ball.vx = speed * Math.sin(angle);
+                ball.vy = speed * Math.cos(angle);
+            }
+            
+            game.lastHit = isPlayer ? 'player' : 'cpu';
+        }
+        
+        function updateCPU() {
+            const ball = game.ball;
+            const cpuRacket = game.cpuRacket;
+            
+            if (ball.vy < 0) {
+                const targetX = ball.x + (ball.vx * 15);
+                const diff = targetX - cpuRacket.x;
+                
+                const moveSpeed = cpuRacket.hp > 0 ? 5 : 0.25;
+                cpuRacket.x += Math.sign(diff) * Math.min(Math.abs(diff), moveSpeed);
+                
+                const court = game.court;
+                cpuRacket.x = Math.max(court.x + cpuRacket.width / 2, 
+                                       Math.min(court.x + court.width - cpuRacket.width / 2, cpuRacket.x));
+            }
+        }
+        
+        function checkOut(ball) {
+            const court = game.court;
+            const leftOut = ball.x - ball.radius < court.x;
+            const rightOut = ball.x + ball.radius > court.x + court.width;
+            const topOut = ball.y - ball.radius < court.y;
+            const bottomOut = ball.y + ball.radius > court.y + court.height;
+            const isOut = leftOut || rightOut || topOut || bottomOut;
+            
+            if (isOut) {
+                const inPlayerSide = ball.y > court.y + court.height / 2;
+                return { isOut: true, inPlayerSide, isSideOut: leftOut || rightOut };
+            }
+            return { isOut: false };
+        }
+        
+        function addPoint(winner) {
+            if (winner === 'player') {
+                gameScore.playerPoints++;
+            } else {
+                gameScore.cpuPoints++;
+            }
+            
+            const playerPts = gameScore.playerPoints;
+            const cpuPts = gameScore.cpuPoints;
+            
+            if (playerPts >= 4 && playerPts >= cpuPts + 2) {
+                gameScore.playerGames++;
+                gameScore.playerPoints = 0;
+                gameScore.cpuPoints = 0;
+                
+                if (gameScore.playerGames >= 6 && gameScore.playerGames >= gameScore.cpuGames + 2) {
+                    gameScore.playerSets++;
+                    gameScore.playerGames = 0;
+                    gameScore.cpuGames = 0;
+                }
+            } else if (cpuPts >= 4 && cpuPts >= playerPts + 2) {
+                gameScore.cpuGames++;
+                gameScore.playerPoints = 0;
+                gameScore.cpuPoints = 0;
+                
+                if (gameScore.cpuGames >= 6 && gameScore.cpuGames >= gameScore.playerGames + 2) {
+                    gameScore.cpuSets++;
+                    gameScore.playerGames = 0;
+                    gameScore.cpuGames = 0;
+                }
+            }
+            
+            setTimeout(() => {
+                gameState = winner === 'player' ? 'playerWin' : 'cpuWin';
+            }, 0);
+        }
+        
+        function update() {
+            if (gameState !== 'playing') return;
+            
+            const ball = game.ball;
+            const cpuRacket = game.cpuRacket;
+            const playerRacket = game.playerRacket;
+            const mousePos = game.mousePos;
+            const court = game.court;
+            
+            if (game.gameStartTime) {
+                const elapsedSeconds = (Date.now() - game.gameStartTime) / 1000;
+                game.baseSpeedMultiplier = 1.0 + (elapsedSeconds * 0.00001);
+            }
+            
+            if (mousePos.y > court.y + court.height / 2) {
+                const followSpeed = playerRacket.hp > 0 ? 1.0 : 0.05;
+                
+                const targetX = mousePos.x;
+                const targetY = mousePos.y;
+                
+                playerRacket.x += (targetX - playerRacket.x) * followSpeed;
+                playerRacket.y += (targetY - playerRacket.y) * followSpeed;
+                
+                playerRacket.x = Math.max(court.x + playerRacket.width / 2, 
+                                           Math.min(court.x + court.width - playerRacket.width / 2, playerRacket.x));
+                playerRacket.y = Math.max(court.y + court.height / 2 + playerRacket.height / 2,
+                                           Math.min(court.y + court.height - playerRacket.height / 2, playerRacket.y));
+            }
+            
+            ball.x += ball.vx * game.baseSpeedMultiplier;
+            ball.y += ball.vy * game.baseSpeedMultiplier;
+            
+            updateCPU();
+            
+            if (game.lastHit !== 'cpu' && checkBallRacketCollision(ball, cpuRacket)) {
+                const effectiveSpeed = ball.speed * game.baseSpeedMultiplier;
+                if (effectiveSpeed >= 7) {
+                    const damage = (effectiveSpeed - 7) * 5;
+                    const previousHp = cpuRacket.hp;
+                    cpuRacket.hp = Math.max(0, cpuRacket.hp - damage);
+                    
+                    if (previousHp > 0 && cpuRacket.hp <= 0) {
+                        const knockbackDistance = 90;
+                        cpuRacket.y = Math.max(court.y + cpuRacket.height / 2, 
+                                                cpuRacket.y - knockbackDistance);
+                        playSound('broken'); // HP0の音を再生
+                    }
+                }
+                
+                hitBall(ball, cpuRacket, false, true);
+            }
+            
+            if (game.lastHit !== 'player' && checkBallRacketCollision(ball, playerRacket)) {
+                const effectiveSpeed = ball.speed * game.baseSpeedMultiplier;
+                if (effectiveSpeed >= 7) {
+                    const damage = (effectiveSpeed - 7) * 5;
+                    const previousHp = playerRacket.hp;
+                    playerRacket.hp = Math.max(0, playerRacket.hp - damage);
+                    
+                    if (previousHp > 0 && playerRacket.hp <= 0) {
+                        const knockbackDistance = 90;
+                        playerRacket.y = Math.min(court.y + court.height - playerRacket.height / 2, 
+                                                  playerRacket.y + knockbackDistance);
+                        playSound('broken'); // HP0の音を再生
+                    }
+                }
+                
+                hitBall(ball, playerRacket, true, false);
+            }
+            
+            const outCheck = checkOut(ball);
+            if (outCheck.isOut) {
+                let winner = null;
+                
+                if (outCheck.isSideOut) {
+                    if (game.lastHit === 'player') {
+                        winner = 'cpu';
+                    } else if (game.lastHit === 'cpu') {
+                        winner = 'player';
+                    }
+                } else {
+                    if (game.lastHit === 'player' && !outCheck.inPlayerSide) {
+                        winner = 'player';
+                    } else if (game.lastHit === 'cpu' && outCheck.inPlayerSide) {
+                        winner = 'cpu';
+                    } else if (game.lastHit === 'player' && outCheck.inPlayerSide) {
+                        winner = 'cpu';
+                    } else if (game.lastHit === 'cpu' && !outCheck.inPlayerSide) {
+                        winner = 'player';
+                    }
+                }
+                
+                if (winner) {
+                    addPoint(winner);
+                } else {
+                    resetBall();
+                    gameState = 'ready';
+                }
+            }
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawCourt();
+            drawRacket(game.cpuRacket, '#ff5252', false, true);
+            drawRacket(game.playerRacket, '#4caf50', true, false);
+            drawBall();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            
+            const pointToString = (points, oppPoints) => {
+                if (points >= 3 && oppPoints >= 3) {
+                    if (points === oppPoints) return 'DEUCE';
+                    return points > oppPoints ? 'AD' : '';
+                }
+                const pointMap = ['0', '15', '30', '40'];
+                return pointMap[points] || '40';
+            };
+            
+            const playerPointStr = pointToString(gameScore.playerPoints, gameScore.cpuPoints);
+            const cpuPointStr = pointToString(gameScore.cpuPoints, gameScore.playerPoints);
+            
+            ctx.fillText(`CPU: ${cpuPointStr}`, 300, 30);
+            ctx.fillText(`Game: ${gameScore.cpuGames} | Set: ${gameScore.cpuSets}`, 500, 30);
+            
+            ctx.fillText(`YOU: ${playerPointStr}`, 300, 590);
+            ctx.fillText(`Game: ${gameScore.playerGames} | Set: ${gameScore.playerSets}`, 500, 590);
+            
+            if (gameState === 'ready') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(200, 250, 400, 100);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText('クリックでサーブ開始', 400, 285);
+                ctx.font = '16px Arial';
+                ctx.fillText('マウスでラケットを動かしてボールを返そう', 400, 315);
+                ctx.fillText('白いミートゾーンで打つと加速！', 400, 335);
+            }
+            
+            if (gameState === 'playerWin' || gameState === 'cpuWin') {
+                const court = game.court;
+                const btnX = court.x + court.width / 2;
+                const btnY = court.y + court.height / 2;
+                const btnWidth = 200;
+                const btnHeight = 60;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(btnX - btnWidth / 2, btnY - btnHeight / 2 - 40, btnWidth, btnHeight + 80);
+                
+                ctx.fillStyle = gameState === 'playerWin' ? '#4caf50' : '#ff5252';
+                ctx.font = 'bold 24px Arial';
+                
+                const isMatchOver = gameScore.playerSets >= 2 || gameScore.cpuSets >= 2;
+                if (isMatchOver) {
+                    ctx.fillText(gameState === 'playerWin' ? 'あなたの勝利！' : 'CPUの勝利！', btnX, btnY - 45);
+                    ctx.font = '18px Arial';
+                    ctx.fillText('マッチ終了', btnX, btnY - 20);
+                } else {
+                    ctx.fillText(gameState === 'playerWin' ? 'ポイント獲得！' : 'ポイント失う...', btnX, btnY - 25);
+                }
+                
+                ctx.fillStyle = '#2196f3';
+                ctx.fillRect(btnX - btnWidth / 2, btnY, btnWidth, btnHeight);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 18px Arial';
+                
+                ctx.fillText(isMatchOver ? '新しいマッチ' : '次のポイント', btnX, btnY + 35);
+                
+                game.nextButton = { x: btnX, y: btnY, width: btnWidth, height: btnHeight };
+            } else {
+                game.nextButton = null;
+            }
+        }
+        
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function resetBall() {
+            const court = game.court;
+            game.ball = {
+                x: court.x + court.width / 2,
+                y: court.y + court.height - 100,
+                vx: 0,
+                vy: 0,
+                radius: 8,
+                speed: 4.8
+            };
+            game.lastHit = null;
+            game.playerRacket.hp = game.playerRacket.maxHp;
+            game.cpuRacket.hp = game.cpuRacket.maxHp;
+        }
+        
+        function startRally() {
+            const ball = game.ball;
+            const court = game.court;
+            
+            if (!game.gameStartTime) {
+                game.gameStartTime = Date.now();
+                game.baseSpeedMultiplier = 1.0;
+            }
+            
+            ball.x = court.x + court.width / 2 + (Math.random() - 0.5) * 100;
+            ball.y = court.y + 150;
+            ball.vx = (Math.random() - 0.5) * 2.4;
+            ball.vy = 4.8;
+            ball.speed = 4.8;
+            game.lastHit = 'cpu';
+            gameState = 'playing';
+        }
+        
+        function nextRally() {
+            const isMatchOver = gameScore.playerSets >= 2 || gameScore.cpuSets >= 2;
+            
+            if (isMatchOver) {
+                gameScore = {
+                    playerPoints: 0,
+                    cpuPoints: 0,
+                    playerGames: 0,
+                    cpuGames: 0,
+                    playerSets: 0,
+                    cpuSets: 0
+                };
+                game.gameStartTime = null;
+            }
+            
+            resetBall();
+            gameState = 'ready';
+        }
+        
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if ((gameState === 'playerWin' || gameState === 'cpuWin') && game.nextButton) {
+                const btn = game.nextButton;
+                if (x >= btn.x - btn.width / 2 && x <= btn.x + btn.width / 2 &&
+                    y >= btn.y && y <= btn.y + btn.height) {
+                    nextRally();
+                    return;
+                }
+            }
+            
+            if (gameState === 'ready') {
+                startRally();
+                return;
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (gameState !== 'playing') return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            game.mousePos = { x, y };
+        });
+        
+        resetBall();
+        gameLoop();
+    </script>
+</body>
+</html>
