@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字数当てゲーム - Character Sentinel</title>
+    <style>
+        :root {
+            --bg-color: #f0f4f8;
+            --card-bg: #ffffff;
+            --primary: #6366f1;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --accent: #10b981;
+            --gold: #f59e0b;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden; /* スクロール防止 */
+        }
+
+        #game-container {
+            width: 95%;
+            max-width: 600px;
+            max-height: 98vh;
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #timer {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        #progress {
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--text-sub);
+        }
+
+        #text-display {
+            background: #f8fafc;
+            padding: 1.2rem;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            text-align: left;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            height: 160px;
+            overflow-y: auto;
+            user-select: none;
+        }
+
+        /* 結果表示エリア（目立つように配置） */
+        #feedback-area {
+            height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .feedback-text {
+            font-size: 1.5rem;
+            font-weight: 900;
+            animation: pop 0.3s ease-out;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        #input-display {
+            font-size: 2.8rem;
+            font-weight: bold;
+            color: var(--primary);
+            border-bottom: 4px solid #e2e8f0;
+            margin: 0 auto;
+            min-width: 120px;
+            text-align: center;
+            padding-bottom: 5px;
+        }
+
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 100%;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .btn {
+            background: #ffffff;
+            border: 2px solid #e2e8f0;
+            padding: 12px;
+            font-size: 1.4rem;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: #f1f5f9;
+        }
+
+        .btn-submit {
+            grid-column: span 2;
+            background: var(--primary);
+            color: white;
+            border: none;
+        }
+
+        .btn-submit:hover { background: #4f46e5; }
+        .btn-clear { background: #f1f5f9; color: var(--text-sub); }
+
+        /* モーダル */
+        #modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            color: white;
+        }
+
+        .modal-content {
+            background: white;
+            color: var(--text-main);
+            padding: 2.5rem;
+            border-radius: 32px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <header>
+            <div id="progress">クリアまであと: <span id="remaining-count">3</span>問</div>
+            <div id="timer">00:00.00</div>
+        </header>
+
+        <div id="text-display">読み込み中...</div>
+
+        <div id="feedback-area">
+            <div id="result-message"></div>
+        </div>
+
+        <div id="input-display"></div>
+
+        <div class="numpad">
+            <button class="btn" onclick="addNum(1)">1</button>
+            <button class="btn" onclick="addNum(2)">2</button>
+            <button class="btn" onclick="addNum(3)">3</button>
+            <button class="btn" onclick="addNum(4)">4</button>
+            <button class="btn" onclick="addNum(5)">5</button>
+            <button class="btn" onclick="addNum(6)">6</button>
+            <button class="btn" onclick="addNum(7)">7</button>
+            <button class="btn" onclick="addNum(8)">8</button>
+            <button class="btn" onclick="addNum(9)">9</button>
+            <button class="btn btn-clear" onclick="clearInput()">C</button>
+            <button class="btn" onclick="addNum(0)">0</button>
+            <button class="btn btn-submit" onclick="submitAnswer()">決定</button>
+        </div>
+    </div>
+
+    <div id="modal">
+        <div class="modal-content">
+            <h2 id="modal-title" style="font-size: 2rem;">Game Clear!</h2>
+            <p id="modal-desc" style="color: var(--text-sub);">素晴らしい直感です！</p>
+            <div id="final-time" style="font-size: 3.5rem; font-weight: bold; color: var(--primary); margin: 1.5rem 0;"></div>
+            <button class="btn btn-submit" style="width: 200px;" onclick="location.reload()">再挑戦</button>
+        </div>
+    </div>
+
+<script>
+    const subjects = ["遠い昔、はるか彼方の銀河系で...","昔々あるところに","埼玉県が","坂戸市が","川越が","さいたま市が","深谷市が","本日は晴天なり。", "驚くべきことに、", "深海に眠る謎は", "昨晩の出来事は", "AIの進化によって", "猫がのんびりと", "都会の喧騒を離れ", "誰もいない教室で"];
+    const middles = ["誰もが予想しなかった結末が待ち受けていました。", "静寂を切り裂くような音が響き渡り、周囲は一瞬でパニックに陥りました。", "私たちの想像を遥かに超えるスピードで、世界を塗り替えていくことになるでしょう。", "微かな記憶の断片を繋ぎ合わせるようにして、少しずつ真実が明らかになりました。", "ふわふわとした毛並みを揺らしながら、陽だまりの中で幸せそうに眠っています。", "美味しい珈琲を飲みながら、読書に耽る時間は何物にも代えがたい至福のひとときです。", "窓の外を眺めていると、遠い日の思い出が走馬灯のように駆け巡りました。"];
+    const tails = ["俺たちの物語はこれからだ！","先生の次回作にご期待ください。","つまり政府の陰謀ってことです。","To Be Continued...","これが私の出した結論です。", "信じるか信じないかはあなた次第です", "物語はここで幕を閉じます。", "次なる挑戦が今、始まります。", "静かな夜が更けていきました。"];
+
+    let currentAnswer = 0;
+    let currentInput = "";
+    let clearedCount = 0;
+    let startTime;
+    let timerInterval;
+    const targetClears = 3;
+    let isGameOver = false;
+
+    function generateText() {
+        let text = "";
+        const targetLen = Math.floor(Math.random() * (500 - 50 + 1)) + 50;
+        while(text.length < targetLen) {
+            text += subjects[Math.floor(Math.random() * subjects.length)];
+            text += middles[Math.floor(Math.random() * middles.length)];
+            text += tails[Math.floor(Math.random() * tails.length)];
+        }
+        text = text.substring(0, targetLen);
+        currentAnswer = text.length;
+        document.getElementById('text-display').innerText = text;
+        document.getElementById('text-display').scrollTop = 0;
+    }
+
+    function updateTimer() {
+        const now = new Date();
+        const diff = now - startTime;
+        const m = Math.floor(diff / 60000).toString().padStart(2, '0');
+        const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+        const ms = Math.floor((diff % 1000) / 10).toString().padStart(2, '0');
+        document.getElementById('timer').innerText = `${m}:${s}.${ms}`;
+    }
+
+    function addNum(num) {
+        if (isGameOver) return;
+        if (currentInput.length < 4) {
+            currentInput += num;
+            document.getElementById('input-display').innerText = currentInput;
+        }
+    }
+
+    function clearInput() {
+        currentInput = "";
+        document.getElementById('input-display').innerText = "";
+    }
+
+    function submitAnswer() {
+        if (currentInput === "" || isGameOver) return;
+
+        const playerVal = parseInt(currentInput);
+        const diff = Math.abs(playerVal - currentAnswer);
+        const msgElement = document.getElementById('result-message');
+        
+        let feedbackHTML = "";
+
+        if (diff <= 5) {
+            // 一発クリア
+            feedbackHTML = `<div class="feedback-text" style="color:var(--gold)">CRITICAL HIT!! (正解: ${currentAnswer})</div>`;
+            msgElement.innerHTML = feedbackHTML;
+            endGame("CRITICAL CLEAR!", "誤差5文字以内!!素晴らしい!!");
+            return;
+        } else if (diff <= 20) {
+            // ポイント獲得
+            clearedCount++;
+            document.getElementById('remaining-count').innerText = targetClears - clearedCount;
+            feedbackHTML = `<div class="feedback-text" style="color:var(--accent)">CLEAR! (正解: ${currentAnswer} / 差: ${diff})</div>`;
+            
+            if (clearedCount >= targetClears) {
+                msgElement.innerHTML = feedbackHTML;
+                endGame("Mission Complete!", "誤差20文字以内!!まぁまぁですね");
+                return;
+            }
+        } else {
+            // 失敗
+            feedbackHTML = `<div class="feedback-text" style="color:var(--error)">MISS (正解: ${currentAnswer} / 差: ${diff})</div>`;
+        }
+
+        msgElement.innerHTML = feedbackHTML;
+        currentInput = "";
+        document.getElementById('input-display').innerText = "";
+        setTimeout(nextQuestion, 1000);
+    }
+
+    function nextQuestion() {
+        if (isGameOver) return;
+        document.getElementById('result-message').innerHTML = "";
+        generateText();
+    }
+
+    function startGame() {
+        generateText();
+        startTime = new Date();
+        timerInterval = setInterval(updateTimer, 10);
+    }
+
+    function endGame(title, desc) {
+        isGameOver = true;
+        clearInterval(timerInterval);
+        const finalTime = document.getElementById('timer').innerText;
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-desc').innerText = desc;
+        document.getElementById('final-time').innerText = finalTime;
+        document.getElementById('modal').style.display = 'flex';
+    }
+
+    window.onload = startGame;
+</script>
+</body>
+</html>

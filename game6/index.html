@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Neon Racer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0d0d11; /* 深いダークブルー */
+            font-family: 'Rajdhani', sans-serif;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.1);
+            border: 2px solid #333;
+        }
+
+        canvas {
+            display: block;
+            background: #1a1a1e;
+        }
+
+        /* UIオーバーレイ */
+        #uiLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* クリックを透過 */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .score-board {
+            font-size: 24px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
+        }
+
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(13, 13, 17, 0.9);
+            padding: 40px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 8px;
+            pointer-events: auto;
+            backdrop-filter: blur(5px);
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 48px;
+            color: #0ff;
+            text-shadow: 0 0 20px #0ff;
+            letter-spacing: 2px;
+        }
+
+        p {
+            color: #aaa;
+            margin-bottom: 30px;
+        }
+
+        button {
+            background: linear-gradient(45deg, #0ff, #0088ff);
+            border: none;
+            padding: 15px 40px;
+            color: #000;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px #0ff;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="450" height="700"></canvas>
+        
+        <div id="uiLayer">
+            <div class="score-board">SCORE: <span id="scoreVal">0</span></div>
+        </div>
+
+        <div id="startScreen">
+            <h1>NEON RACER</h1>
+            <p>Left / Right Keys to Move</p>
+            <button onclick="startGame()">START ENGINE</button>
+        </div>
+
+        <div id="gameOverScreen" class="hidden">
+            <h1 style="color: #ff3366; text-shadow: 0 0 20px #ff3366;">CRASHED</h1>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <button onclick="startGame()">RETRY</button>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('scoreVal');
+    const finalScoreEl = document.getElementById('finalScore');
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+
+    // ゲーム設定
+    const LANE_WIDTH = 450;
+    let gameRunning = false;
+    let score = 0;
+    let speed = 5;
+    let frameCount = 0;
+
+    // プレイヤー設定
+    const player = {
+        x: 200,
+        y: 550,
+        w: 40,
+        h: 70,
+        color: '#00ffff',
+        vx: 0,
+        speed: 7
+    };
+
+    // 操作状態
+    const keys = {
+        ArrowLeft: false,
+        ArrowRight: false,
+        a: false,
+        d: false
+    };
+
+    // 敵（CPU）管理
+    let enemies = [];
+    // パーティクル管理
+    let particles = [];
+    // 道路のライン
+    let roadOffsetY = 0;
+
+    // キー入力イベント
+    document.addEventListener('keydown', (e) => {
+        if(keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.key.toLowerCase())) {
+            keys[e.key] = true;
+        }
+    });
+    document.addEventListener('keyup', (e) => {
+        if(keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.key.toLowerCase())) {
+            keys[e.key] = false;
+        }
+    });
+
+    function startGame() {
+        // リセット処理
+        gameRunning = true;
+        score = 0;
+        speed = 5;
+        player.x = canvas.width / 2 - player.w / 2;
+        player.vx = 0;
+        enemies = [];
+        particles = [];
+        scoreEl.innerText = '0';
+        
+        startScreen.classList.add('hidden');
+        gameOverScreen.classList.add('hidden');
+        
+        requestAnimationFrame(update);
+    }
+
+    function gameOver() {
+        gameRunning = false;
+        finalScoreEl.innerText = score;
+        gameOverScreen.classList.remove('hidden');
+    }
+
+    function spawnEnemy() {
+        const lane = Math.random() * (canvas.width - 60); // ランダムなX位置
+        const enemy = {
+            x: lane,
+            y: -100,
+            w: 40,
+            h: 70,
+            color: Math.random() > 0.5 ? '#ff3366' : '#ffaa00', // 赤かオレンジ
+            speed: speed * (0.8 + Math.random() * 0.4) // 速度にばらつきを持たせる
+        };
+        enemies.push(enemy);
+    }
+
+    function createParticle(x, y, color) {
+        particles.push({
+            x: x,
+            y: y,
+            size: Math.random() * 3 + 1,
+            speedY: speed,
+            life: 1, // 透明度
+            color: color
+        });
+    }
+
+    function drawCar(x, y, w, h, color, isPlayer) {
+        ctx.fillStyle = color;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = color;
+        
+        // 車体（モダンな形状）
+        ctx.beginPath();
+        if (isPlayer) {
+            // プレイヤー：少し鋭角的
+            ctx.moveTo(x + w/2, y);
+            ctx.lineTo(x + w, y + h);
+            ctx.lineTo(x + w/2, y + h - 10);
+            ctx.lineTo(x, y + h);
+        } else {
+            // 敵：少しブロック状
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + w, y);
+            ctx.lineTo(x + w - 5, y + h);
+            ctx.lineTo(x + 5, y + h);
+        }
+        ctx.fill();
+        
+        ctx.shadowBlur = 0; // 他の描画に影響しないようにリセット
+        
+        // エンジン光
+        ctx.fillStyle = '#fff';
+        const engineY = isPlayer ? y + h : y;
+        ctx.fillRect(x + 10, engineY - 2, 5, 2);
+        ctx.fillRect(x + w - 15, engineY - 2, 5, 2);
+    }
+
+    function update() {
+        if (!gameRunning) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // --- 背景（道路）の描画 ---
+        // 道路のグリッド効果
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.lineWidth = 1;
+        roadOffsetY = (roadOffsetY + speed) % 40;
+        
+        // 横線
+        for (let i = 0; i < canvas.height + 40; i += 40) {
+            ctx.beginPath();
+            ctx.moveTo(0, i + roadOffsetY - 40);
+            ctx.lineTo(canvas.width, i + roadOffsetY - 40);
+            ctx.stroke();
+        }
+        
+        // 縦線（パースペクティブ風の装飾）
+        ctx.beginPath();
+        ctx.moveTo(canvas.width * 0.3, 0);
+        ctx.lineTo(canvas.width * 0.3, canvas.height);
+        ctx.moveTo(canvas.width * 0.7, 0);
+        ctx.lineTo(canvas.width * 0.7, canvas.height);
+        ctx.stroke();
+
+
+        // --- プレイヤー処理 ---
+        // 加速・慣性処理
+        if (keys.ArrowLeft || keys.a) player.vx -= 1;
+        if (keys.ArrowRight || keys.d) player.vx += 1;
+        
+        player.vx *= 0.9; // 摩擦
+        player.x += player.vx;
+
+        // 壁衝突判定
+        if (player.x < 0) { player.x = 0; player.vx = 0; }
+        if (player.x + player.w > canvas.width) { player.x = canvas.width - player.w; player.vx = 0; }
+
+        // プレイヤー描画
+        drawCar(player.x, player.y, player.w, player.h, player.color, true);
+        
+        // プレイヤーのトレイル（軌跡）パーティクル生成
+        if (frameCount % 3 === 0) {
+            createParticle(player.x + 10 + Math.random()*20, player.y + 60, '#00ffff');
+        }
+
+
+        // --- 敵処理 ---
+        if (frameCount % (Math.max(20, 100 - Math.floor(score/50))) === 0) {
+            spawnEnemy();
+        }
+
+        for (let i = 0; i < enemies.length; i++) {
+            let e = enemies[i];
+            e.y += e.speed;
+
+            // 衝突判定 (AABB)
+            if (
+                player.x < e.x + e.w &&
+                player.x + player.w > e.x &&
+                player.y < e.y + e.h &&
+                player.y + player.h > e.y
+            ) {
+                gameOver();
+            }
+
+            // 画面外に出たら削除＆スコア加算
+            if (e.y > canvas.height) {
+                enemies.splice(i, 1);
+                i--;
+                score += 10;
+                scoreEl.innerText = score;
+                
+                // スピードアップ
+                if (score % 100 === 0) {
+                    speed += 0.5;
+                }
+            } else {
+                drawCar(e.x, e.y, e.w, e.h, e.color, false);
+            }
+        }
+
+
+        // --- パーティクル描画 ---
+        for (let i = 0; i < particles.length; i++) {
+            let p = particles[i];
+            p.y += p.speedY * 0.5; // 画面下に流れる
+            p.life -= 0.05;
+            
+            if (p.life <= 0) {
+                particles.splice(i, 1);
+                i--;
+            } else {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        // --- UI装飾（スピードライン） ---
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        for(let i=0; i<3; i++) {
+            if(Math.random() > 0.8) {
+                let lx = Math.random() * canvas.width;
+                let ly = Math.random() * canvas.height;
+                let lh = Math.random() * 50 + 20;
+                ctx.fillRect(lx, ly, 2, lh);
+            }
+        }
+
+        frameCount++;
+        requestAnimationFrame(update);
+    }
+</script>
+</body>
+</html>
