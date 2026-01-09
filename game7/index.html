@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【地獄の終焉】AI視界埋没Web</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; cursor: default; }
+        body { font-family: "MS PGothic", sans-serif; overflow: hidden; background: #000; }
+        
+        /* ブラウザ UI */
+        #browserChrome { position: fixed; top: 0; left: 0; width: 100vw; height: 80px; background: #202124; z-index: 999999; border-bottom: 2px solid #f00; }
+        #tabBar { display: flex; padding: 10px; gap: 2px; overflow-x: auto; }
+        .tab { background: #35363a; color: #9aa0a6; padding: 8px 12px; border-radius: 4px 4px 0 0; font-size: 10px; min-width: 100px; white-space: nowrap; }
+
+        #viewport { position: relative; width: 100vw; height: calc(100vh - 80px); margin-top: 80px; background: #fff; overflow: hidden; }
+        
+        /* ターゲットボタン（この地獄で見つけられるか？） */
+        #targetButton { position: absolute; padding: 10px 20px; background: #00c853; color: #fff; border: none; font-size: 16px; font-weight: bold; z-index: 100; transition: 0.05s; }
+
+        /* 画面を埋め尽くす広告群 */
+        .heavy-ad { position: absolute; z-index: 500000; background: #fff; border: 4px solid #f00; box-shadow: 10px 10px 0 rgba(0,0,0,0.5); display: flex; flex-direction: column; overflow: hidden; animation: flash 0.5s infinite alternate; }
+        @keyframes flash { from { border-color: #f00; } to { border-color: #ff0; } }
+        
+        .ad-header { background: #f00; color: #fff; padding: 2px; font-size: 12px; font-weight: bold; display: flex; justify-content: space-between; cursor: pointer; }
+        .ad-body { padding: 10px; text-align: center; font-size: 14px; font-weight: 900; color: #000; }
+
+        /* マウスを惑わす残像広告 */
+        .mouse-trail { position: fixed; width: 80px; height: 60px; background: rgba(255,255,255,0.8); border: 1px solid blue; z-index: 900000; pointer-events: none; font-size: 8px; color: blue; text-align: center; }
+
+        /* UI */
+        #ui { position: fixed; top: 90px; left: 10px; z-index: 950000; background: #000; color: #0f0; padding: 10px; font-family: 'Courier New', monospace; font-size: 12px; border: 1px solid #0f0; }
+
+        /* 終了・開始画面 */
+        #startScreen, #overlay { position: fixed; inset: 0; z-index: 2000000; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; text-align: center; }
+        .btn-action { padding: 20px 40px; background: #f00; color: #fff; border: none; font-size: 24px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="startScreen">
+        <h1 style="color: #f00; font-size: 50px; text-shadow: 0 0 20px #f00;">⚠️ TOTAL CHAOS ⚠️</h1>
+        <div style="border: 2px solid #ff0; padding: 20px; margin: 20px; max-width: 700px; text-align: left;">
+            <p style="color: #ff0; font-weight: bold;">【地獄の仕様書】</p>
+            <p>・死ぬがよい。<br>
+
+        </div>
+        <button class="btn-action" onclick="startGame()">絶望を受け入れる</button>
+    </div>
+
+    <div id="browserChrome">
+        <div id="tabBar"><div id="mainTab" class="tab active" style="background:#fff; color:#000;">🛡️ REAL_SYSTEM_FILE</div></div>
+    </div>
+
+    <div id="viewport">
+        <div id="ui">
+            THREAT_DENSITY: 99.9%<br>
+            ACTIVE_ADS: <span id="adCount">0</span><br>
+            TIME: <span id="timer">45</span>s
+        </div>
+        <button id="targetButton">📥 DOWNLOAD NOW</button>
+        <div id="barrier" style="position:absolute; inset:0; background:rgba(0,0,0,0.8); z-index:800000; display:flex; justify-content:center; align-items:center; color:white;">
+            <h2 id="waitMsg">AI解析中... (5s)</h2>
+        </div>
+    </div>
+
+    <div id="overlay" style="display:none;">
+        <h1 id="endTitle" style="font-size: 60px;"></h1>
+        <button class="btn-action" style="background:#fff; color:#000; margin-top:30px;" onclick="location.reload()">転生する</button>
+    </div>
+
+    <script>
+        let timeLeft = 45, isGameActive = false, mX = 0, mY = 0, adCount = 0;
+        const target = document.getElementById('targetButton');
+        const viewport = document.getElementById('viewport');
+        const tabBar = document.getElementById('tabBar');
+
+        document.addEventListener('mousemove', (e) => {
+            mX = e.clientX; mY = e.clientY;
+            if(isGameActive) {
+                spawnTrail();
+                moveButton();
+            }
+        });
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            isGameActive = true;
+            target.style.left = '50%'; target.style.top = '70%';
+
+            // 開幕のブロッキング
+            let wait = 5;
+            const waitInt = setInterval(() => {
+                wait--;
+                document.getElementById('waitMsg').textContent = `AI解析中... (${wait}s)`;
+                if(wait <= 0) {
+                    clearInterval(waitInt);
+                    document.getElementById('barrier').style.display = 'none';
+                }
+            }, 1000);
+
+            // 広告の超高速生成
+            setInterval(() => { if(isGameActive) spawnHeavyAd(); }, 350);
+            
+            // 定期的な「タブ爆撃」
+            setInterval(() => { if(isGameActive && Math.random() > 0.8) openFakeTab(); }, 2000);
+
+            const timerInt = setInterval(() => {
+                if(!isGameActive) return clearInterval(timerInt);
+                timeLeft--;
+                document.getElementById('timer').textContent = timeLeft;
+                if(timeLeft <= 0) end(false);
+            }, 1000);
+        }
+
+        function spawnHeavyAd() {
+            const ad = document.createElement('div');
+            ad.className = 'heavy-ad';
+            const w = 180 + Math.random() * 200;
+            const h = 120 + Math.random() * 150;
+            ad.style.width = w + 'px';
+            ad.style.height = h + 'px';
+            ad.style.left = Math.random() * (window.innerWidth - w) + 'px';
+            ad.style.top = Math.random() * (window.innerHeight - h - 80) + 'px';
+
+            const messages = ["⚠️ウイルス検出", "💰5億円当選！", "🔥PCが熱い！", "🚫今すぐ修復", "⌛期限切れ"];
+            ad.innerHTML = `
+                <div class="ad-header" onclick="openFakeTab()"><span>SYSTEM ALERT</span><span>×</span></div>
+                <div class="ad-body">${messages[Math.floor(Math.random()*messages.length)]}</div>
+                <button onclick="fail()" style="background:blue; color:white; border:none; padding:5px;">詳細を確認</button>
+            `;
+            
+            ad.onclick = (e) => { e.stopPropagation(); openFakeTab(); };
+            viewport.appendChild(ad);
+            adCount++;
+            document.getElementById('adCount').textContent = adCount;
+            setTimeout(() => { if(ad.parentNode) ad.remove(); }, 4000);
+        }
+
+        function spawnTrail() {
+            const trail = document.createElement('div');
+            trail.className = 'mouse-trail';
+            trail.style.left = mX + 'px';
+            trail.style.top = mY + 'px';
+            trail.innerHTML = "AD BLOCK<br>FAILED";
+            document.body.appendChild(trail);
+            setTimeout(() => trail.remove(), 400);
+        }
+
+        function openFakeTab() {
+            const tab = document.createElement('div');
+            tab.className = 'tab';
+            tab.style.background = '#f00';
+            tab.style.color = '#fff';
+            tab.innerHTML = `⚠️ OVERLOAD_${Math.floor(Math.random()*999)}`;
+            tabBar.appendChild(tab);
+        }
+
+        function moveButton() {
+            const r = target.getBoundingClientRect();
+            const dist = Math.hypot(mX - (r.left + r.width/2), mY - (r.top + r.height/2));
+            if (dist < 180) {
+                const angle = Math.atan2((r.top + r.height/2) - mY, (r.left + r.width/2) - mX);
+                target.style.left = Math.max(10, Math.min(window.innerWidth-100, r.left + Math.cos(angle)*60)) + 'px';
+                target.style.top = Math.max(100, Math.min(window.innerHeight-100, r.top + Math.sin(angle)*60 - 80)) + 'px';
+            }
+        }
+
+        function fail() { if(isGameActive) end(false); }
+        target.onclick = (e) => { e.stopPropagation(); if(isGameActive) end(true); };
+
+        function end(win) {
+            isGameActive = false;
+            document.getElementById('overlay').style.display = 'flex';
+            document.getElementById('endTitle').textContent = win ? '🏆 MIRACLE SUCCESS' : '💀 SYSTEM ASHES';
+            document.getElementById('endTitle').style.color = win ? '#0f0' : '#f00';
+        }
+    </script>
+</body>
+</html>
