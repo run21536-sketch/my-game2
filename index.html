@@ -2,20 +2,117 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ミニゲーム集</title>
+    <style>
+        /* 全体の基本設定 */
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: #f4f7f9; /* 少しグレーがかった背景でおしゃれに */
+            color: #333;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 2rem;
+            color: #2c3e50;
+        }
+
+        /* ゲームを並べるグリッド */
+        .game-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* 画面幅に合わせて自動調整 */
+            gap: 25px;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0;
+            list-style: none;
+        }
+
+        /* 各ゲームのカードスタイル */
+        .game-item {
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); /* 軽い影 */
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* マウスを置いた時の動き */
+        .game-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        .game-item a {
+            text-decoration: none;
+            display: block;
+        }
+
+        .game-item img {
+            width: 100%;
+            height: 150px; /* 高さを統一 */
+            object-fit: cover; /* 画像の比率を保ちつつ枠を埋める */
+            display: block;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* タイトル部分のテキスト（必要に応じて） */
+        .game-title {
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.95rem;
+            color: #444;
+        }
+
+    </style>
 </head>
 <body>
-    <h1>ミニゲーム集</h1>
-    <ul>
-        <a href="game1/index.html">
-            <img src="トラクターサムネ.png"width="200"></a>
-        <a href="game2/index.html">
-            <img src="おでんクリッカーサムネ.png"width="200"></a>
-        <a href="game3/index.html">テニスゲーム</a>
-        <a href="game4/index.html">面接ゲーム</a>
-        <a href="game5/index.html">文字数当てゲーム</a>
-        <a href="game6/index.html">インベーダー？</a>
-        
+
+    <h1>🎮 ミニゲーム集</h1>
+
+    <ul class="game-list">
+        <li class="game-item">
+            <a href="game1/index.html">
+                <img src="トラクターサムネ.png" alt="トラクター">
+                <div class="game-title">トラクター</div>
+            </a>
+        </li>
+        <li class="game-item">
+            <a href="game2/index.html">
+                <img src="おでんクリッカーサムネ.png" alt="おでんクリッカー">
+                <div class="game-title">おでんクリッカー</div>
+            </a>
+        </li>
+        <li class="game-item">
+            <a href="game3/index.html">
+                <img src="テニス仮.png" alt="テニス仮">
+                <div class="game-title">テニス（仮）</div>
+            </a>
+        </li>
+        <li class="game-item">
+            <a href="game4/index.html">
+                <img src="面接.png" alt="面接">
+                <div class="game-title">面接</div>
+            </a>
+        </li>
+        <li class="game-item">
+            <a href="game5/index.html">
+                <img src="文字数当て.png" alt="文字数当て">
+                <div class="game-title">文字数当て</div>
+            </a>
+        </li>
+        <li class="game-item">
+            <a href="game6/index.html">
+                <img src="インベーダー.png" alt="インベーダー">
+                <div class="game-title">インベーダー</div>
+            </a>
+        </li>
     </ul>
+
 </body>
 </html>
