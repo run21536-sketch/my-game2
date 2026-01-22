@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGB色合わせ - 1問勝負！</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+            display: none;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .color-display {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+
+        .box {
+            width: 150px;
+            height: 150px;
+            border-radius: 10px;
+            border: 4px solid #eee;
+            transition: background-color 0.1s;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input[type="range"] { flex-grow: 1; cursor: pointer; }
+        .label { width: 60px; font-weight: bold; }
+        .val { width: 40px; font-family: monospace; }
+
+        button {
+            margin-top: 15px;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        button:hover { transform: scale(1.05); background-color: #218838; }
+
+        /* フィードバックメッセージのスタイル */
+        #game-message {
+            margin-top: 20px;
+            padding: 10px;
+            min-height: 1.5em;
+            font-weight: bold;
+            color: #d9534f; /* エラーっぽい赤色 */
+            border-radius: 5px;
+        }
+
+        .timer-display { font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div id="start-screen" class="overlay">
+    <h1>RGB色合わせゲーム</h1>
+    <p>スライダーで色を調整して、ターゲットの色を作ろう！</p>
+    <p><b>【クリア条件】</b><br>RGBの誤差合計が <b>20以内</b> で正解</p>
+    <button id="start-btn">ゲームスタート！</button>
+</div>
+
+<div class="container" id="game-container">
+    <div class="timer-display">TIME: <span id="timer">0.00</span>s</div>
+
+    <div class="color-display">
+        <div>
+            <div>ターゲット</div>
+            <div id="target-box" class="box"></div>
+        </div>
+        <div>
+            <div>あなたの色</div>
+            <div id="user-box" class="box"></div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="slider-group">
+            <span class="label" style="color:red">Red</span>
+            <input type="range" id="r" min="0" max="255" value="127">
+            <span id="r-val" class="val">127</span>
+        </div>
+        <div class="slider-group">
+            <span class="label" style="color:green">Green</span>
+            <input type="range" id="g" min="0" max="255" value="127">
+            <span id="g-val" class="val">127</span>
+        </div>
+        <div class="slider-group">
+            <span class="label" style="color:blue">Blue</span>
+            <input type="range" id="b" min="0" max="255" value="127">
+            <span id="b-val" class="val">127</span>
+        </div>
+    </div>
+
+    <button id="check-btn">これで決定！</button>
+    
+    <div id="game-message"></div>
+</div>
+
+<div id="result-overlay" class="overlay" style="display: none;">
+    <h2 style="font-size: 2.5rem; color: #28a745;">CLEAR!</h2>
+    <p style="font-size: 1.5rem;">タイム: <span id="final-time"></span>秒</p>
+    <p id="accuracy-info" style="background: #f8f9fa; padding: 15px; border-radius: 10px;"></p>
+    <button onclick="location.reload()">もう一度挑戦</button>
+</div>
+
+<script>
+    let targetR, targetG, targetB;
+    let startTime, timerInterval;
+
+    const startScreen = document.getElementById('start-screen');
+    const gameContainer = document.getElementById('game-container');
+    const rSlider = document.getElementById('r');
+    const gSlider = document.getElementById('g');
+    const bSlider = document.getElementById('b');
+    const userBox = document.getElementById('user-box');
+    const targetBox = document.getElementById('target-box');
+    const checkBtn = document.getElementById('check-btn');
+    const gameMessage = document.getElementById('game-message');
+
+    document.getElementById('start-btn').addEventListener('click', () => {
+        startScreen.style.display = 'none';
+        gameContainer.style.display = 'block';
+        initGame();
+    });
+
+    function initGame() {
+        targetR = Math.floor(Math.random() * 256);
+        targetG = Math.floor(Math.random() * 256);
+        targetB = Math.floor(Math.random() * 256);
+        targetBox.style.backgroundColor = `rgb(${targetR}, ${targetG}, ${targetB})`;
+        updateUserColor();
+        startTime = Date.now();
+        timerInterval = setInterval(() => {
+            document.getElementById('timer').textContent = ((Date.now() - startTime) / 1000).toFixed(2);
+        }, 10);
+    }
+
+    function updateUserColor() {
+        const r = rSlider.value, g = gSlider.value, b = bSlider.value;
+        userBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+        document.getElementById('r-val').textContent = r;
+        document.getElementById('g-val').textContent = g;
+        document.getElementById('b-val').textContent = b;
+        // スライダーを動かしている間はメッセージを消す
+        gameMessage.textContent = "";
+    }
+
+    function checkMatch() {
+        const r = parseInt(rSlider.value), g = parseInt(gSlider.value), b = parseInt(bSlider.value);
+        const diffR = Math.abs(r - targetR), diffG = Math.abs(g - targetG), diffB = Math.abs(b - targetB);
+        const totalDiff = diffR + diffG + diffB;
+
+        if (totalDiff <= 20) {
+            // クリア処理
+            clearInterval(timerInterval);
+            const finalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            document.getElementById('final-time').textContent = finalTime;
+            document.getElementById('accuracy-info').innerHTML = 
+                `ターゲット: <b>(${targetR}, ${targetG}, ${targetB})</b><br>` +
+                `あなたの色: <b>(${r}, ${g}, ${b})</b><br>` +
+                `誤差合計: ${totalDiff}`;
+            document.getElementById('result-overlay').style.display = 'flex';
+        } else {
+            // アラートの代わりにテキストを表示
+            gameMessage.innerHTML = `まだ惜しい！ 誤差の合計: ${totalDiff}<br><small>(あと ${totalDiff - 20} 減らして！)</small>`;
+            // 軽く揺らすアニメーション（おまけ）
+            gameMessage.animate([
+                { transform: 'translateX(-5px)' },
+                { transform: 'translateX(5px)' },
+                { transform: 'translateX(0)' }
+            ], { duration: 100, iterations: 2 });
+        }
+    }
+
+    [rSlider, gSlider, bSlider].forEach(slider => {
+        slider.addEventListener('input', updateUserColor);
+    });
+
+    checkBtn.addEventListener('click', checkMatch);
+</script>
+
+</body>
+</html>

@@ -2,374 +2,505 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Neon Racer</title>
+    <title>アストロ・ファーマー v2</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');
-
         body {
             margin: 0;
-            overflow: hidden;
-            background-color: #0d0d11; /* 深いダークブルー */
-            font-family: 'Rajdhani', sans-serif;
-            color: white;
+            padding: 0;
+            background-color: #050505;
             display: flex;
-            justify-content: center;
+            justify_content: center;
             align-items: center;
             height: 100vh;
+            color: #fff;
+            font-family: 'Courier New', sans-serif; /* レトロ感のあるフォント */
+            overflow: hidden;
         }
-
-        #gameContainer {
-            position: relative;
-            box-shadow: 0 0 50px rgba(0, 255, 255, 0.1);
-            border: 2px solid #333;
-        }
-
         canvas {
-            display: block;
-            background: #1a1a1e;
+            background-color: #000;
+            border: 2px solid #333;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
         }
-
-        /* UIオーバーレイ */
-        #uiLayer {
+        #ui {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; /* クリックを透過 */
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-
-        .score-board {
-            font-size: 24px;
-            text-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
-        }
-
-        #startScreen, #gameOverScreen {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            background: rgba(13, 13, 17, 0.9);
-            padding: 40px;
-            border: 1px solid rgba(0, 255, 255, 0.3);
-            border-radius: 8px;
-            pointer-events: auto;
-            backdrop-filter: blur(5px);
-        }
-
-        h1 {
-            margin: 0 0 10px 0;
-            font-size: 48px;
-            color: #0ff;
-            text-shadow: 0 0 20px #0ff;
-            letter-spacing: 2px;
-        }
-
-        p {
-            color: #aaa;
-            margin-bottom: 30px;
-        }
-
-        button {
-            background: linear-gradient(45deg, #0ff, #0088ff);
-            border: none;
-            padding: 15px 40px;
-            color: #000;
-            font-family: 'Rajdhani', sans-serif;
-            font-weight: 700;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
             font-size: 20px;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            text-shadow: 2px 2px 0 #000;
         }
-
-        button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 30px #0ff;
+        #shield-display {
+            color: #00FFFF;
+            margin-top: 5px;
         }
-
-        .hidden {
-            display: none !important;
-        }
-
     </style>
 </head>
 <body>
 
-    <div id="gameContainer">
-        <canvas id="gameCanvas" width="450" height="700"></canvas>
-        
-        <div id="uiLayer">
-            <div class="score-board">SCORE: <span id="scoreVal">0</span></div>
-        </div>
-
-        <div id="startScreen">
-            <h1>NEON RACER</h1>
-            <p>Left / Right Keys to Move</p>
-            <button onclick="startGame()">START ENGINE</button>
-        </div>
-
-        <div id="gameOverScreen" class="hidden">
-            <h1 style="color: #ff3366; text-shadow: 0 0 20px #ff3366;">CRASHED</h1>
-            <p>Final Score: <span id="finalScore">0</span></p>
-            <button onclick="startGame()">RETRY</button>
-        </div>
-    </div>
+<canvas id="gameCanvas" width="600" height="800"></canvas>
+<div id="ui">
+    <div>SCORE: <span id="score">0</span></div>
+    <div id="shield-display">SHIELD: <span id="shield-count">0</span></div>
+</div>
 
 <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const scoreEl = document.getElementById('scoreVal');
-    const finalScoreEl = document.getElementById('finalScore');
-    const startScreen = document.getElementById('startScreen');
-    const gameOverScreen = document.getElementById('gameOverScreen');
+/* =========================================
+   ゲーム設定
+   ========================================= */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const shieldEl = document.getElementById('shield-count');
 
-    // ゲーム設定
-    const LANE_WIDTH = 450;
-    let gameRunning = false;
-    let score = 0;
-    let speed = 5;
-    let frameCount = 0;
+// グローバル変数
+let gameState = 'START'; // START, PLAYING, GAMEOVER, WAITING
+let score = 0;
+let frames = 0;
+let difficulty = 1; // 難易度係数
 
-    // プレイヤー設定
-    const player = {
-        x: 200,
-        y: 550,
-        w: 40,
-        h: 70,
-        color: '#00ffff',
-        vx: 0,
-        speed: 7
-    };
+// 入力管理
+const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, Space: false };
 
-    // 操作状態
-    const keys = {
-        ArrowLeft: false,
-        ArrowRight: false,
-        a: false,
-        d: false
-    };
+// プレイヤー設定
+const player = {
+    x: 300, y: 700, w: 30, h: 50, speed: 5,
+    color: 'white',
+    bullets: [],
+    lastShotTime: 0,
+    shotDelay: 8, // 基本攻撃力は一定
+    shield: 0,    // 現在のシールド枚数
+    maxShield: 3,
+    invincible: 0 // 無敵時間フレーム
+};
 
-    // 敵（CPU）管理
-    let enemies = [];
-    // パーティクル管理
-    let particles = [];
-    // 道路のライン
-    let roadOffsetY = 0;
+// オブジェクト管理
+let enemies = [];
+let enemyBullets = [];
+let powerUps = [];
+let particles = [];
+let retryTimer = null; // ゲームオーバー後のタイマー用
 
-    // キー入力イベント
-    document.addEventListener('keydown', (e) => {
-        if(keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.key.toLowerCase())) {
-            keys[e.key] = true;
+/* =========================================
+   クラス定義
+   ========================================= */
+
+// 敵クラス
+class Enemy {
+    constructor() {
+        this.w = 40;
+        this.h = 40;
+        this.x = Math.random() * (canvas.width - this.w);
+        this.y = -50;
+        // 難易度に応じて少し速度変化の幅を持たせる
+        this.speedY = Math.random() * 3 + 2 + (difficulty * 0.1); 
+        this.speedX = Math.random() * 2 - 1;
+        this.color = '#ff3333';
+        this.shootTimer = Math.random() * 100;
+    }
+
+    update() {
+        this.y += this.speedY;
+        this.x += this.speedX;
+        if (this.x < 0 || this.x > canvas.width - this.w) this.speedX *= -1;
+
+        // 弾幕発射頻度も難易度で少し上がる
+        this.shootTimer++;
+        let shootThreshold = Math.max(40, 90 - (difficulty * 2)); 
+        
+        if (this.shootTimer > shootThreshold) { 
+            this.shoot();
+            this.shootTimer = 0;
         }
-    });
-    document.addEventListener('keyup', (e) => {
-        if(keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.key.toLowerCase())) {
-            keys[e.key] = false;
-        }
-    });
+    }
 
-    function startGame() {
-        // リセット処理
-        gameRunning = true;
-        score = 0;
-        speed = 5;
-        player.x = canvas.width / 2 - player.w / 2;
-        player.vx = 0;
-        enemies = [];
-        particles = [];
-        scoreEl.innerText = '0';
+    shoot() {
+        // 敵の弾：視認性アップのため少し大きく、明るく
+        const bx = this.x + this.w / 2;
+        const by = this.y + this.h;
+        enemyBullets.push(new EnemyBullet(bx, by, 0));
+        enemyBullets.push(new EnemyBullet(bx, by, -2.5));
+        enemyBullets.push(new EnemyBullet(bx, by, 2.5));
+    }
+
+    draw() {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        // 敵のデザイン（簡易的な目）
+        ctx.fillStyle = 'black';
+        ctx.fillRect(this.x + 10, this.y + 10, 5, 5);
+        ctx.fillRect(this.x + 25, this.y + 10, 5, 5);
+    }
+}
+
+// 敵の弾（視認性改善版）
+class EnemyBullet {
+    constructor(x, y, dx) {
+        this.x = x;
+        this.y = y;
+        this.r = 7; // サイズアップ
+        this.dy = 5; // 速度
+        this.dx = dx;
+    }
+    update() {
+        this.y += this.dy;
+        this.x += this.dx;
+    }
+    draw() {
+        ctx.save();
+        // ネオンピンクで発光させる
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "#ff00ff"; 
+        ctx.fillStyle = '#ff00cc';
         
-        startScreen.classList.add('hidden');
-        gameOverScreen.classList.add('hidden');
-        
-        requestAnimationFrame(update);
-    }
-
-    function gameOver() {
-        gameRunning = false;
-        finalScoreEl.innerText = score;
-        gameOverScreen.classList.remove('hidden');
-    }
-
-    function spawnEnemy() {
-        const lane = Math.random() * (canvas.width - 60); // ランダムなX位置
-        const enemy = {
-            x: lane,
-            y: -100,
-            w: 40,
-            h: 70,
-            color: Math.random() > 0.5 ? '#ff3366' : '#ffaa00', // 赤かオレンジ
-            speed: speed * (0.8 + Math.random() * 0.4) // 速度にばらつきを持たせる
-        };
-        enemies.push(enemy);
-    }
-
-    function createParticle(x, y, color) {
-        particles.push({
-            x: x,
-            y: y,
-            size: Math.random() * 3 + 1,
-            speedY: speed,
-            life: 1, // 透明度
-            color: color
-        });
-    }
-
-    function drawCar(x, y, w, h, color, isPlayer) {
-        ctx.fillStyle = color;
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = color;
-        
-        // 車体（モダンな形状）
         ctx.beginPath();
-        if (isPlayer) {
-            // プレイヤー：少し鋭角的
-            ctx.moveTo(x + w/2, y);
-            ctx.lineTo(x + w, y + h);
-            ctx.lineTo(x + w/2, y + h - 10);
-            ctx.lineTo(x, y + h);
-        } else {
-            // 敵：少しブロック状
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + w, y);
-            ctx.lineTo(x + w - 5, y + h);
-            ctx.lineTo(x + 5, y + h);
-        }
+        ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
         
-        ctx.shadowBlur = 0; // 他の描画に影響しないようにリセット
+        // 中心に白い芯を描いて見やすくする
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r/2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// シールドアイテム（パワーアップから変更）
+class ShieldItem {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.w = 25;
+        this.h = 25;
+        this.dy = 2.5;
+    }
+    update() {
+        this.y += this.dy;
+    }
+    draw() {
+        ctx.save();
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#00ffff";
+        ctx.fillStyle = '#00ffff'; // シアン色
+        ctx.fillRect(this.x, this.y, this.w, this.h);
         
-        // エンジン光
-        ctx.fillStyle = '#fff';
-        const engineY = isPlayer ? y + h : y;
-        ctx.fillRect(x + 10, engineY - 2, 5, 2);
-        ctx.fillRect(x + w - 15, engineY - 2, 5, 2);
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.w, this.h);
+        
+        // 「S」の文字
+        ctx.fillStyle = 'black';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText("S", this.x + this.w/2, this.y + this.h/2);
+        ctx.restore();
+    }
+}
+
+// 星（背景）
+class Star {
+    constructor() {
+        this.reset();
+        this.y = Math.random() * canvas.height; // 初回は画面全体に
+    }
+    reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = 0;
+        this.size = Math.random() * 2 + 0.5;
+        this.speed = Math.random() * 5 + 1; // 疾走感を出すため少し速く
+    }
+    update() {
+        this.y += this.speed;
+        if (this.y > canvas.height) this.reset();
+    }
+    draw() {
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.5 + 0.5})`;
+        ctx.fillRect(this.x, this.y, this.size, this.size);
+    }
+}
+
+/* =========================================
+   メインロジック
+   ========================================= */
+
+function init() {
+    particles = [];
+    for(let i=0; i<80; i++) particles.push(new Star());
+    
+    window.addEventListener('keydown', e => {
+        if(keys.hasOwnProperty(e.code)) keys[e.code] = true;
+        
+        // 3秒待機後のリスタート処理
+        if (gameState === 'WAITING' && e.code === 'Space') {
+            resetGame();
+        }
+        // 初回スタート
+        if (gameState === 'START' && e.code === 'Space') {
+            resetGame();
+        }
+    });
+    window.addEventListener('keyup', e => {
+        if(keys.hasOwnProperty(e.code)) keys[e.code] = false;
+    });
+
+    requestAnimationFrame(gameLoop);
+}
+
+function resetGame() {
+    player.x = 300; player.y = 700;
+    player.bullets = [];
+    player.shield = 0;
+    player.invincible = 0;
+    
+    enemies = [];
+    enemyBullets = [];
+    powerUps = [];
+    
+    score = 0;
+    difficulty = 1;
+    frames = 0;
+    
+    updateUI();
+    gameState = 'PLAYING';
+}
+
+function updateUI() {
+    scoreEl.innerText = score;
+    // シールド表示を記号で
+    shieldEl.innerText = "🛡️".repeat(player.shield) || "NONE";
+}
+
+function update() {
+    if (gameState !== 'PLAYING') return;
+
+    frames++;
+
+    // 難易度調整：スコア500点ごとに難易度UP
+    difficulty = 1 + Math.floor(score / 500);
+
+    // 背景
+    particles.forEach(p => p.update());
+
+    // プレイヤー移動
+    if (keys.ArrowLeft && player.x > 0) player.x -= player.speed;
+    if (keys.ArrowRight && player.x < canvas.width - player.w) player.x += player.speed;
+    if (keys.ArrowUp && player.y > 0) player.y -= player.speed;
+    if (keys.ArrowDown && player.y < canvas.height - player.h) player.y += player.speed;
+
+    // 無敵時間の減少
+    if (player.invincible > 0) player.invincible--;
+
+    // プレイヤー発射（基本は2連装で固定）
+    if (keys.Space && frames - player.lastShotTime > player.shotDelay) {
+        player.lastShotTime = frames;
+        player.bullets.push({x: player.x, y: player.y, dx: 0, dy: -12});
+        player.bullets.push({x: player.x + player.w, y: player.y, dx: 0, dy: -12});
     }
 
-    function update() {
-        if (!gameRunning) return;
+    // プレイヤー弾更新
+    for (let i = player.bullets.length - 1; i >= 0; i--) {
+        let b = player.bullets[i];
+        b.y += b.dy;
+        if (b.y < 0) player.bullets.splice(i, 1);
+    }
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 敵出現ロジック（難易度が上がると出現間隔が短くなる）
+    // 最速で20フレームに1体
+    let spawnRate = Math.max(20, 60 - (difficulty * 2));
+    if (frames % spawnRate === 0) {
+        enemies.push(new Enemy());
+    }
 
-        // --- 背景（道路）の描画 ---
-        // 道路のグリッド効果
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.lineWidth = 1;
-        roadOffsetY = (roadOffsetY + speed) % 40;
+    // 敵の処理
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        e.update();
+
+        // プレイヤー弾との当たり判定
+        for (let j = player.bullets.length - 1; j >= 0; j--) {
+            let b = player.bullets[j];
+            if (isColliding({x: b.x-2, y: b.y, w:4, h:10}, {x: e.x, y: e.y, w: e.w, h: e.h})) {
+                enemies.splice(i, 1);
+                player.bullets.splice(j, 1);
+                score += 10 + (difficulty * 2); // 難易度高いとスコアも高い
+                updateUI();
+
+                // シールドアイテムドロップ（確率は低め：10%）
+                // ただしシールドが0の時は少し出やすくする(20%)
+                let dropRate = player.shield === 0 ? 0.2 : 0.1;
+                if (Math.random() < dropRate) {
+                    powerUps.push(new ShieldItem(e.x, e.y));
+                }
+                break; 
+            }
+        }
         
-        // 横線
-        for (let i = 0; i < canvas.height + 40; i += 40) {
+        // 画面外
+        if (e.y > canvas.height + 50) {
+            if (enemies[i]) enemies.splice(i, 1);
+        }
+
+        // プレイヤーとの衝突
+        if (player.invincible === 0 && isColliding(player, {x: e.x, y: e.y, w: e.w, h: e.h})) {
+            handlePlayerHit();
+            // 敵も消滅
+            if (enemies[i]) enemies.splice(i, 1);
+        }
+    }
+
+    // 敵弾の処理
+    for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        let eb = enemyBullets[i];
+        eb.update();
+        if (eb.y > canvas.height || eb.x < 0 || eb.x > canvas.width) {
+            enemyBullets.splice(i, 1);
+            continue;
+        }
+        // プレイヤー被弾判定
+        // 当たり判定を少し小さくして「避けやすく」する（かすり判定）
+        if (player.invincible === 0 && 
+            isCircleRectColliding(eb, {x: player.x + 5, y: player.y + 5, w: player.w - 10, h: player.h - 10})) {
+            handlePlayerHit();
+            enemyBullets.splice(i, 1);
+        }
+    }
+
+    // アイテム取得処理
+    for (let i = powerUps.length - 1; i >= 0; i--) {
+        let p = powerUps[i];
+        p.update();
+        if (isColliding(player, p)) {
+            if (player.shield < player.maxShield) {
+                player.shield++;
+                score += 500;
+            } else {
+                score += 1000; // カンスト時はスコアボーナス
+            }
+            updateUI();
+            powerUps.splice(i, 1);
+        } else if (p.y > canvas.height) {
+            powerUps.splice(i, 1);
+        }
+    }
+}
+
+// プレイヤー被弾時の処理
+function handlePlayerHit() {
+    if (player.shield > 0) {
+        player.shield--;
+        player.invincible = 90; // 1.5秒無敵
+        updateUI();
+        // 画面揺らし等のエフェクトを入れたいが今回は省略
+    } else {
+        triggerGameOver();
+    }
+}
+
+function triggerGameOver() {
+    gameState = 'GAMEOVER';
+    // 3秒後にリトライ可能状態にする
+    setTimeout(() => {
+        gameState = 'WAITING';
+    }, 3000);
+}
+
+// 矩形判定
+function isColliding(r1, r2) {
+    return (r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y);
+}
+// 円と矩形の判定（敵弾用）
+function isCircleRectColliding(circle, rect) {
+    let testX = circle.x;
+    let testY = circle.y;
+    if (circle.x < rect.x) testX = rect.x;
+    else if (circle.x > rect.x + rect.w) testX = rect.x + rect.w;
+    if (circle.y < rect.y) testY = rect.y;
+    else if (circle.y > rect.y + rect.h) testY = rect.y + rect.h;
+    
+    let distX = circle.x - testX;
+    let distY = circle.y - testY;
+    return (distX * distX + distY * distY) <= (circle.r * circle.r);
+}
+
+function draw() {
+    // 画面クリア
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 背景
+    particles.forEach(p => p.draw());
+
+    if (gameState === 'START') {
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.font = '50px Courier New';
+        ctx.fillText("ASTRO FARMER", canvas.width/2, canvas.height/2 - 40);
+        ctx.font = '20px Courier New';
+        ctx.fillText("Collect Shields [S] to Survive", canvas.width/2, canvas.height/2 + 20);
+        ctx.fillText("Press SPACE to Start", canvas.width/2, canvas.height/2 + 60);
+        return;
+    }
+
+    // プレイヤー描画
+    if (player.invincible % 10 < 5) { // 無敵時は点滅
+        ctx.fillStyle = player.color;
+        // トラクター（長方形）
+        ctx.fillRect(player.x, player.y, player.w, player.h);
+
+        // シールド展開エフェクト
+        if (player.shield > 0) {
+            ctx.strokeStyle = `rgba(0, 255, 255, ${0.3 + (player.shield * 0.2)})`;
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(0, i + roadOffsetY - 40);
-            ctx.lineTo(canvas.width, i + roadOffsetY - 40);
+            ctx.arc(player.x + player.w/2, player.y + player.h/2, 40, 0, Math.PI*2);
             ctx.stroke();
         }
-        
-        // 縦線（パースペクティブ風の装飾）
-        ctx.beginPath();
-        ctx.moveTo(canvas.width * 0.3, 0);
-        ctx.lineTo(canvas.width * 0.3, canvas.height);
-        ctx.moveTo(canvas.width * 0.7, 0);
-        ctx.lineTo(canvas.width * 0.7, canvas.height);
-        ctx.stroke();
-
-
-        // --- プレイヤー処理 ---
-        // 加速・慣性処理
-        if (keys.ArrowLeft || keys.a) player.vx -= 1;
-        if (keys.ArrowRight || keys.d) player.vx += 1;
-        
-        player.vx *= 0.9; // 摩擦
-        player.x += player.vx;
-
-        // 壁衝突判定
-        if (player.x < 0) { player.x = 0; player.vx = 0; }
-        if (player.x + player.w > canvas.width) { player.x = canvas.width - player.w; player.vx = 0; }
-
-        // プレイヤー描画
-        drawCar(player.x, player.y, player.w, player.h, player.color, true);
-        
-        // プレイヤーのトレイル（軌跡）パーティクル生成
-        if (frameCount % 3 === 0) {
-            createParticle(player.x + 10 + Math.random()*20, player.y + 60, '#00ffff');
-        }
-
-
-        // --- 敵処理 ---
-        if (frameCount % (Math.max(20, 100 - Math.floor(score/50))) === 0) {
-            spawnEnemy();
-        }
-
-        for (let i = 0; i < enemies.length; i++) {
-            let e = enemies[i];
-            e.y += e.speed;
-
-            // 衝突判定 (AABB)
-            if (
-                player.x < e.x + e.w &&
-                player.x + player.w > e.x &&
-                player.y < e.y + e.h &&
-                player.y + player.h > e.y
-            ) {
-                gameOver();
-            }
-
-            // 画面外に出たら削除＆スコア加算
-            if (e.y > canvas.height) {
-                enemies.splice(i, 1);
-                i--;
-                score += 10;
-                scoreEl.innerText = score;
-                
-                // スピードアップ
-                if (score % 100 === 0) {
-                    speed += 0.5;
-                }
-            } else {
-                drawCar(e.x, e.y, e.w, e.h, e.color, false);
-            }
-        }
-
-
-        // --- パーティクル描画 ---
-        for (let i = 0; i < particles.length; i++) {
-            let p = particles[i];
-            p.y += p.speedY * 0.5; // 画面下に流れる
-            p.life -= 0.05;
-            
-            if (p.life <= 0) {
-                particles.splice(i, 1);
-                i--;
-            } else {
-                ctx.globalAlpha = p.life;
-                ctx.fillStyle = p.color;
-                ctx.fillRect(p.x, p.y, p.size, p.size);
-                ctx.globalAlpha = 1.0;
-            }
-        }
-
-        // --- UI装飾（スピードライン） ---
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        for(let i=0; i<3; i++) {
-            if(Math.random() > 0.8) {
-                let lx = Math.random() * canvas.width;
-                let ly = Math.random() * canvas.height;
-                let lh = Math.random() * 50 + 20;
-                ctx.fillRect(lx, ly, 2, lh);
-            }
-        }
-
-        frameCount++;
-        requestAnimationFrame(update);
     }
+
+    // 弾
+    ctx.fillStyle = 'yellow';
+    player.bullets.forEach(b => ctx.fillRect(b.x - 2, b.y, 4, 12));
+
+    // 敵・アイテム
+    enemies.forEach(e => e.draw());
+    powerUps.forEach(p => p.draw());
+    enemyBullets.forEach(eb => eb.draw());
+
+    // ゲームオーバー画面
+    if (gameState === 'GAMEOVER' || gameState === 'WAITING') {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = 'red';
+        ctx.textAlign = 'center';
+        ctx.font = '60px Courier New';
+        ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 20);
+        
+        ctx.fillStyle = 'white';
+        ctx.font = '30px Courier New';
+        ctx.fillText("Final Score: " + score, canvas.width/2, canvas.height/2 + 50);
+
+        if (gameState === 'WAITING') {
+            ctx.fillStyle = '#00ffff'; // シアン色で誘導
+            ctx.font = '20px Courier New';
+            ctx.fillText("> Press SPACE to Retry <", canvas.width/2, canvas.height/2 + 100);
+        } else {
+            ctx.fillStyle = 'gray';
+            ctx.font = '16px Courier New';
+            ctx.fillText("Wait...", canvas.width/2, canvas.height/2 + 100);
+        }
+    }
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+init();
+
 </script>
 </body>
 </html>

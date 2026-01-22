@@ -3,121 +3,303 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ミニゲーム集</title>
+    <title>ジャンプゲーム</title>
     <style>
-        /* 全体の基本設定 */
+        /* 1. 背景を白に変更 */
         body {
-            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
-            background-color: #f4f7f9; /* 少しグレーがかった背景でおしゃれに */
-            color: #333;
             margin: 0;
-            padding: 40px 20px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #ffffff; 
+            font-family: Arial, sans-serif;
+            color: #333;
         }
-
-        h1 {
+        canvas {
+            border: 3px solid #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            background: #4682b4;
+        }
+        .info {
+            margin-top: 20px;
             text-align: center;
-            margin-bottom: 40px;
-            font-size: 2rem;
-            color: #2c3e50;
         }
-
-        /* ゲームを並べるグリッド */
-        .game-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* 画面幅に合わせて自動調整 */
-            gap: 25px;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 0;
-            list-style: none;
-        }
-
-        /* 各ゲームのカードスタイル */
-        .game-item {
-            background: #fff;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1); /* 軽い影 */
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        /* マウスを置いた時の動き */
-        .game-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-        }
-
-        .game-item a {
-            text-decoration: none;
-            display: block;
-        }
-
-        .game-item img {
-            width: 100%;
-            height: 150px; /* 高さを統一 */
-            object-fit: cover; /* 画像の比率を保ちつつ枠を埋める */
-            display: block;
-            border-bottom: 1px solid #eee;
-        }
-
-        /* タイトル部分のテキスト（必要に応じて） */
-        .game-title {
-            padding: 10px;
-            text-align: center;
+        .controls {
+            color: #555;
+            margin-top: 10px;
+            font-size: 18px;
             font-weight: bold;
-            font-size: 0.8rem;
-            color: #444;
         }
-
     </style>
 </head>
 <body>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div class="info">
+        <div class="controls">スペースorクリックでジャンプ</div>
+    </div>
 
-    <h1>🎮 ミニゲーム集</h1>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const WIDTH = 800;
+        const HEIGHT = 400;
+        const GROUND_LINE = HEIGHT - 100; // 地面の基準線
+        
+        // 色定義
+        const WHITE = '#FFFFFF';
+        const BLACK = '#000000';
+        const RED = '#FF0000';
+        const GREEN = '#00FF00';
+        const GRAY = '#808080';
+        
+        // 画像オブジェクトの準備
+        const images = {
+            player: new Image(),
+            cloud: new Image(),
+            block: new Image(),
+            hole: new Image()
+        };
+        images.player.src = 'game1/asset/torakuta-.png';
+        images.cloud.src = 'game1/asset/pixel_kumo.png';
+        images.block.src = 'game1/asset/pixel-art_pro.png'; // blockはpro
+        images.hole.src = 'game1/asset/pixel_usi.png';      // holeはusi
 
-    <ul class="game-list">
-        <li class="game-item">
-            <a href="game1/index.html">
-                <img src="トラクターサムネ.png" alt="トラクター">
-                <div class="game-title">トラクター</div>
-            </a>
-        </li>
-        <li class="game-item">
-            <a href="game2/index.html">
-                <img src="おでんクリッカーサムネ.png" alt="おでんクリッカー">
-                <div class="game-title">おでんクリッカー</div>
-            </a>
-        </li>
-        <li class="game-item">
-            <a href="game3/index.html">
-                <img src="テニス仮.png" alt="テニス仮">
-                <div class="game-title">テニス（仮）</div>
-            </a>
-        </li>
-        <li class="game-item">
-            <a href="game4/index.html">
-                <img src="面接.png" alt="面接">
-                <div class="game-title">面接</div>
-            </a>
-        </li>
-        <li class="game-item">
-            <a href="game5/index.html">
-                <img src="文字数当て.png" alt="文字数当て">
-                <div class="game-title">文字数当て</div>
-            </a>
-        </li>
-        <li class="game-item">
-            <a href="game6/index.html">
-                <img src="インベーダー.png" alt="インベーダー">
-                <div class="game-title">インベーダー</div>
-            </a>
-        </li>
-        <li class="game-item">
-            <a href="game7/index.html">
-                <img src="広告.png" alt="広告避け">
-                <div class="game-title">広告避け</div>
-            </a>
-    </ul>
+        class Player {
+            constructor() {
+                this.width = 60;
+                this.height = 50;
+                this.x = 100;
+                this.y = GROUND_LINE - this.height;
+                this.velocityY = 0;
+                this.jumpPower = -15;
+                this.gravity = 0.8;
+                this.groundY = GROUND_LINE - this.height;
+                this.jumpCount = 0;
+                this.maxJumps = 2;
+            }
+            
+            jump() {
+                if (this.jumpCount < this.maxJumps) {
+                    this.velocityY = (this.jumpCount === 0) ? this.jumpPower : this.jumpPower / 1.5;
+                    this.jumpCount++;
+                }
+            }
+            
+            update() {
+                this.velocityY += this.gravity;
+                this.y += this.velocityY;
+                
+                if (this.y >= this.groundY) {
+                    this.y = this.groundY;
+                    this.velocityY = 0;
+                    this.jumpCount = 0;
+                }
+            }
+            
+            draw(ctx) {
+                if (images.player.complete) {
+                    ctx.drawImage(images.player, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = GREEN;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+        }
+        
+        class Obstacle {
+            constructor(x, obsType = 'block') {
+                this.type = obsType;
+                this.width = (this.type === 'block') ? 90 : 80;
+                this.height = (this.type === 'block') ? (Math.floor(Math.random() * 40) + 40) : 60;
+                this.x = x;
+                
+                // 【修正】holeもblockと同じく地面(GROUND_LINE)を基準にしたy座標にする
+                this.y = GROUND_LINE - this.height;
+                
+                this.speed = 5;
+            }
+            
+            update() {
+                this.x -= this.speed;
+            }
+            
+            draw(ctx) {
+                let img = (this.type === 'block') ? images.block : images.hole;
+                if (img.complete) {
+                    ctx.drawImage(img, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = (this.type === 'block') ? RED : BLACK;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+            
+            isOffScreen() { return this.x + this.width < 0; }
+        }
 
+        class Cloud {
+            constructor() {
+                this.width = Math.floor(Math.random() * 70) + 80;
+                this.height = Math.floor(Math.random() * 40) + 50;
+                this.x = WIDTH + Math.floor(Math.random() * 200);
+                this.y = Math.floor(Math.random() * 150) + 20;
+                this.speed = 2;
+            }
+            update() { this.x -= this.speed; }
+            draw(ctx) {
+                if (images.cloud.complete) {
+                    ctx.drawImage(images.cloud, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = WHITE;
+                    ctx.beginPath();
+                    ctx.ellipse(this.x + this.width/2, this.y + this.height/2, this.width/2, this.height/2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            isOffScreen() { return this.x + this.width < 0; }
+        }
+
+        class Game {
+            constructor() {
+                this.player = new Player();
+                this.obstacles = [];
+                this.clouds = [];
+                this.score = 0;
+                this.distance = 0;
+                this.gameOver = false;
+                this.gameOverTime = 0;
+                this.obstacleTimer = 0;
+                this.cloudTimer = 0;
+                
+                // 初期状態の雲
+                for (let i = 0; i < 3; i++) {
+                    const c = new Cloud();
+                    c.x = Math.random() * WIDTH;
+                    this.clouds.push(c);
+                }
+            }
+            
+            update() {
+                if (this.gameOver) return;
+                
+                this.player.update();
+                
+                this.score++;
+                this.distance = Math.floor(this.score / 10);
+                
+                // 【修正】進むにつれ障害物の出現間隔を短くする（密度を上げる）
+                // 距離に応じて、間隔が90から徐々に25まで縮まります
+                let currentInterval = Math.max(25, 90 - Math.floor(this.distance / 5));
+                
+                this.obstacleTimer++;
+                if (this.obstacleTimer > currentInterval) {
+                    const type = Math.random() > 0.4 ? 'block' : 'hole';
+                    this.obstacles.push(new Obstacle(WIDTH, type));
+                    this.obstacleTimer = 0;
+                }
+                
+                for (let i = this.obstacles.length - 1; i >= 0; i--) {
+                    this.obstacles[i].update();
+                    if (this.obstacles[i].isOffScreen()) {
+                        this.obstacles.splice(i, 1);
+                    } else if (this.checkCollision(this.obstacles[i])) {
+                        this.gameOver = true;
+                        this.gameOverTime = Date.now();
+                    }
+                }
+                
+                // 雲の更新
+                if (Math.random() < 0.01) this.clouds.push(new Cloud());
+                for (let i = this.clouds.length - 1; i >= 0; i--) {
+                    this.clouds[i].update();
+                    if (this.clouds[i].isOffScreen()) this.clouds.splice(i, 1);
+                }
+            }
+            
+            checkCollision(obs) {
+                // 当たり判定を少し小さくして遊びやすく調整
+                return this.player.x < obs.x + obs.width - 10 &&
+                       this.player.x + this.player.width > obs.x + 10 &&
+                       this.player.y < obs.y + obs.height - 5 &&
+                       this.player.y + this.player.height > obs.y + 5;
+            }
+            
+            draw(ctx) {
+                // 背景の空
+                ctx.fillStyle = '#4682b4';
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+                
+                for (const c of this.clouds) c.draw(ctx);
+                
+                // 地面
+                ctx.fillStyle = GRAY;
+                ctx.fillRect(0, GROUND_LINE, WIDTH, 100);
+                
+                this.player.draw(ctx);
+                for (const obs of this.obstacles) obs.draw(ctx);
+                
+                // スコア表示
+                ctx.fillStyle = WHITE;
+                ctx.font = 'bold 24px Arial';
+                ctx.fillText(`Distance: ${this.distance}m`, 20, 40);
+                
+                if (this.gameOver) this.drawGameOver(ctx);
+            }
+            
+            drawGameOver(ctx) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+                
+                ctx.fillStyle = WHITE;
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 72px Arial';
+                ctx.fillText('GAME OVER', WIDTH / 2, HEIGHT / 2 - 20);
+                
+                ctx.font = '30px Arial';
+                ctx.fillText(`Score: ${this.distance}m`, WIDTH / 2, HEIGHT / 2 + 40);
+                
+                const waitTime = Date.now() - this.gameOverTime;
+                if (waitTime > 2000) {
+                    ctx.fillStyle = GREEN;
+                    ctx.fillText('Click or Space to Restart', WIDTH / 2, HEIGHT / 2 + 100);
+                } else {
+                    ctx.fillStyle = '#aaa';
+                    ctx.font = '20px Arial';
+                    ctx.fillText(`Wait ${Math.ceil((2000 - waitTime)/1000)}s...`, WIDTH / 2, HEIGHT / 2 + 100);
+                }
+                ctx.textAlign = 'left';
+            }
+        }
+        
+        let game = new Game();
+        
+        function handleInput() {
+            if (game.gameOver) {
+                if (Date.now() - game.gameOverTime > 2000) {
+                    game = new Game();
+                }
+            } else {
+                game.player.jump();
+            }
+        }
+        
+        canvas.addEventListener('click', handleInput);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                handleInput();
+            }
+        });
+        
+        function gameLoop() {
+            game.update();
+            game.draw(ctx);
+            requestAnimationFrame(gameLoop);
+        }
+        gameLoop();
+    </script>
 </body>
 </html>
