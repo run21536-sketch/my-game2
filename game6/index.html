@@ -2,504 +2,462 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>アストロ・ファーマー v2</title>
+    <title>ASTRO FARMER - REFINED</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background-color: #050505;
+            background-color: #050510;
             display: flex;
-            justify_content: center;
+            justify-content: center;
             align-items: center;
             height: 100vh;
             color: #fff;
-            font-family: 'Courier New', sans-serif; /* レトロ感のあるフォント */
+            font-family: 'Courier New', Courier, monospace;
             overflow: hidden;
         }
-        canvas {
-            background-color: #000;
-            border: 2px solid #333;
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.2);
+            border: 4px solid #444;
+            background: #000;
         }
+
+        /* ブラウン管のスキャンライン演出 */
+        #game-container::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        canvas { display: block; }
+
         #ui {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 15px;
+            left: 15px;
             pointer-events: none;
-            font-size: 20px;
-            text-shadow: 2px 2px 0 #000;
+            z-index: 20;
+            text-shadow: 2px 2px #000;
         }
-        #shield-display {
-            color: #00FFFF;
-            margin-top: 5px;
-        }
+
+        .label { font-size: 12px; color: #0ff; margin-bottom: 2px; }
+        .value { font-size: 20px; font-weight: bold; margin-bottom: 15px; letter-spacing: 2px; }
     </style>
 </head>
 <body>
 
-<canvas id="gameCanvas" width="600" height="800"></canvas>
-<div id="ui">
-    <div>SCORE: <span id="score">0</span></div>
-    <div id="shield-display">SHIELD: <span id="shield-count">0</span></div>
+<div id="game-container">
+    <canvas id="gameCanvas" width="500" height="700"></canvas>
+    <div id="ui">
+        <div class="label">HI-SCORE</div>
+        <div id="hi-score" class="value" style="color:#ffcc00">000000</div>
+        <div class="label">SCORE</div>
+        <div id="score" class="value">000000</div>
+        <div class="label">SHIELD</div>
+        <div id="shield-count" class="value">NONE</div>
+        <div class="label">WEAPON</div>
+        <div id="power-level" class="value">Lv.1</div>
+    </div>
 </div>
 
 <script>
 /* =========================================
-   ゲーム設定
+   1. ゲーム設定と定数
    ========================================= */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const scoreEl = document.getElementById('score');
-const shieldEl = document.getElementById('shield-count');
 
-// グローバル変数
-let gameState = 'START'; // START, PLAYING, GAMEOVER, WAITING
-let score = 0;
-let frames = 0;
-let difficulty = 1; // 難易度係数
-
-// 入力管理
-const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, Space: false };
-
-// プレイヤー設定
-const player = {
-    x: 300, y: 700, w: 30, h: 50, speed: 5,
-    color: 'white',
-    bullets: [],
-    lastShotTime: 0,
-    shotDelay: 8, // 基本攻撃力は一定
-    shield: 0,    // 現在のシールド枚数
-    maxShield: 3,
-    invincible: 0 // 無敵時間フレーム
+const CONFIG = {
+    MAX_SHIELD: 3,
+    MAX_POWER: 3,
+    PLAYER_SPEED: 5,
+    BULLET_W: 4,
+    BULLET_H: 12
 };
 
-// オブジェクト管理
-let enemies = [];
-let enemyBullets = [];
-let powerUps = [];
-let particles = [];
-let retryTimer = null; // ゲームオーバー後のタイマー用
+let gameState = 'START';
+let score = 0;
+let hiScore = localStorage.getItem('astroFarmerHiScore') || 0;
+let frames = 0;
+let difficulty = 1;
+
+// 入力管理
+const keys = {};
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+// オブジェクト管理用配列
+let player, enemies, enemyBullets, playerBullets, items, particles, stars;
 
 /* =========================================
-   クラス定義
+   2. クラス定義
    ========================================= */
 
-// 敵クラス
-class Enemy {
+// --- 自機クラス ---
+class Player {
     constructor() {
-        this.w = 40;
-        this.h = 40;
-        this.x = Math.random() * (canvas.width - this.w);
-        this.y = -50;
-        // 難易度に応じて少し速度変化の幅を持たせる
-        this.speedY = Math.random() * 3 + 2 + (difficulty * 0.1); 
-        this.speedX = Math.random() * 2 - 1;
-        this.color = '#ff3333';
-        this.shootTimer = Math.random() * 100;
+        this.w = 30;
+        this.h = 35;
+        this.x = canvas.width / 2 - this.w / 2;
+        this.y = canvas.height - 80;
+        this.shield = 0;
+        this.power = 1;
+        this.invincible = 0;
+        this.shotTimer = 0;
     }
 
     update() {
-        this.y += this.speedY;
-        this.x += this.speedX;
-        if (this.x < 0 || this.x > canvas.width - this.w) this.speedX *= -1;
+        // 移動
+        if (keys.ArrowLeft && this.x > 0) this.x -= CONFIG.PLAYER_SPEED;
+        if (keys.ArrowRight && this.x < canvas.width - this.w) this.x += CONFIG.PLAYER_SPEED;
+        if (keys.ArrowUp && this.y > 0) this.y -= CONFIG.PLAYER_SPEED;
+        if (keys.ArrowDown && this.y < canvas.height - this.h) this.y += CONFIG.PLAYER_SPEED;
 
-        // 弾幕発射頻度も難易度で少し上がる
-        this.shootTimer++;
-        let shootThreshold = Math.max(40, 90 - (difficulty * 2)); 
-        
-        if (this.shootTimer > shootThreshold) { 
+        if (this.invincible > 0) this.invincible--;
+
+        // 自動射撃
+        this.shotTimer++;
+        const interval = this.power === 3 ? 7 : 10;
+        if (this.shotTimer >= interval) {
             this.shoot();
-            this.shootTimer = 0;
+            this.shotTimer = 0;
         }
     }
 
     shoot() {
-        // 敵の弾：視認性アップのため少し大きく、明るく
         const bx = this.x + this.w / 2;
-        const by = this.y + this.h;
-        enemyBullets.push(new EnemyBullet(bx, by, 0));
-        enemyBullets.push(new EnemyBullet(bx, by, -2.5));
-        enemyBullets.push(new EnemyBullet(bx, by, 2.5));
+        if (this.power === 1) {
+            playerBullets.push(new PlayerBullet(bx, this.y, 0));
+        } else if (this.power === 2) {
+            playerBullets.push(new PlayerBullet(bx - 10, this.y, 0));
+            playerBullets.push(new PlayerBullet(bx + 10, this.y, 0));
+        } else {
+            playerBullets.push(new PlayerBullet(bx, this.y, 0));
+            playerBullets.push(new PlayerBullet(bx - 15, this.y, -1.5));
+            playerBullets.push(new PlayerBullet(bx + 15, this.y, 1.5));
+        }
     }
 
     draw() {
-        ctx.fillStyle = this.color;
-        ctx.fillRect(this.x, this.y, this.w, this.h);
-        // 敵のデザイン（簡易的な目）
-        ctx.fillStyle = 'black';
-        ctx.fillRect(this.x + 10, this.y + 10, 5, 5);
-        ctx.fillRect(this.x + 25, this.y + 10, 5, 5);
+        if (this.invincible % 10 < 5) {
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(this.x + this.w / 2, this.y);
+            ctx.lineTo(this.x, this.y + this.h);
+            ctx.lineTo(this.x + this.w, this.y + this.h);
+            ctx.fill();
+        }
+        // シールドエフェクト
+        if (this.shield > 0) {
+            ctx.strokeStyle = '#0ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x + this.w / 2, this.y + this.h / 2, 30, 0, Math.PI * 2);
+            ctx.stroke();
+        }
     }
 }
 
-// 敵の弾（視認性改善版）
-class EnemyBullet {
+// --- 自機の弾クラス ---
+class PlayerBullet {
     constructor(x, y, dx) {
-        this.x = x;
+        this.x = x - CONFIG.BULLET_W / 2;
         this.y = y;
-        this.r = 7; // サイズアップ
-        this.dy = 5; // 速度
+        this.w = CONFIG.BULLET_W; // 判定に必要
+        this.h = CONFIG.BULLET_H; // 判定に必要
         this.dx = dx;
+        this.dy = -12;
     }
     update() {
-        this.y += this.dy;
         this.x += this.dx;
+        this.y += this.dy;
     }
     draw() {
-        ctx.save();
-        // ネオンピンクで発光させる
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = "#ff00ff"; 
-        ctx.fillStyle = '#ff00cc';
-        
+        ctx.fillStyle = '#ff0';
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
+}
+
+// --- 敵クラス ---
+class Enemy {
+    constructor() {
+        this.w = 30;
+        this.h = 30;
+        this.x = Math.random() * (canvas.width - this.w);
+        this.y = -40;
+        // 難易度に応じて速度アップ
+        this.speedY = 2 + (difficulty * 0.4);
+    }
+    update() {
+        this.y += this.speedY;
+        // 難易度に応じて発射頻度アップ
+        const shootChance = Math.max(20, 80 - (difficulty * 6));
+        if (frames % shootChance === 0) this.shoot();
+    }
+    shoot() {
+        const bx = this.x + this.w / 2;
+        const by = this.y + this.h;
+        // 難易度が上がると自機を狙う弾を撃つ
+        if (difficulty >= 4 && Math.random() < 0.3 + (difficulty * 0.05)) {
+            const angle = Math.atan2(player.y - by, player.x - bx);
+            enemyBullets.push(new EnemyBullet(bx, by, angle));
+        } else {
+            enemyBullets.push(new EnemyBullet(bx, by, Math.PI / 2));
+        }
+    }
+    draw() {
+        ctx.fillStyle = (difficulty > 5) ? '#ff0055' : '#ff4444';
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        // 目
+        ctx.fillStyle = '#000';
+        ctx.fillRect(this.x + 6, this.y + 8, 4, 4);
+        ctx.fillRect(this.x + 20, this.y + 8, 4, 4);
+    }
+}
+
+// --- 敵の弾クラス ---
+class EnemyBullet {
+    constructor(x, y, angle) {
+        this.x = x;
+        this.y = y;
+        const speed = 4 + (difficulty * 0.5); // 難易度で弾速アップ
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.r = 5;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+    }
+    draw() {
+        ctx.fillStyle = '#f0f';
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
         ctx.fill();
-        ctx.restore();
-        
-        // 中心に白い芯を描いて見やすくする
-        ctx.fillStyle = 'white';
+        ctx.fillStyle = '#fff'; // 中心を白くして輝かせる
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.r/2, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
         ctx.fill();
     }
 }
 
-// シールドアイテム（パワーアップから変更）
-class ShieldItem {
+// --- アイテムクラス ---
+class Item {
     constructor(x, y) {
         this.x = x;
         this.y = y;
+        this.type = Math.random() < 0.5 ? 'S' : 'P';
         this.w = 25;
         this.h = 25;
-        this.dy = 2.5;
     }
-    update() {
-        this.y += this.dy;
-    }
+    update() { this.y += 2; }
     draw() {
-        ctx.save();
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = "#00ffff";
-        ctx.fillStyle = '#00ffff'; // シアン色
+        ctx.fillStyle = (this.type === 'S') ? '#0ff' : '#f44';
         ctx.fillRect(this.x, this.y, this.w, this.h);
-        
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(this.x, this.y, this.w, this.h);
-        
-        // 「S」の文字
-        ctx.fillStyle = 'black';
-        ctx.font = 'bold 20px Arial';
+        ctx.fillStyle = '#fff';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText("S", this.x + this.w/2, this.y + this.h/2);
-        ctx.restore();
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText(this.type, this.x + 12, this.y + 19);
     }
 }
 
-// 星（背景）
-class Star {
-    constructor() {
-        this.reset();
-        this.y = Math.random() * canvas.height; // 初回は画面全体に
+// --- 爆発エフェクト ---
+class Particle {
+    constructor(x, y, color) {
+        this.x = x; this.y = y;
+        this.vx = (Math.random() - 0.5) * 10;
+        this.vy = (Math.random() - 0.5) * 10;
+        this.life = 1.0;
+        this.color = color;
     }
-    reset() {
-        this.x = Math.random() * canvas.width;
-        this.y = 0;
-        this.size = Math.random() * 2 + 0.5;
-        this.speed = Math.random() * 5 + 1; // 疾走感を出すため少し速く
-    }
-    update() {
-        this.y += this.speed;
-        if (this.y > canvas.height) this.reset();
-    }
+    update() { this.x += this.vx; this.y += this.vy; this.life -= 0.04; }
     draw() {
-        ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.5 + 0.5})`;
-        ctx.fillRect(this.x, this.y, this.size, this.size);
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, 3, 3);
+        ctx.globalAlpha = 1.0;
     }
 }
 
 /* =========================================
-   メインロジック
+   3. ゲームシステム・ロジック
    ========================================= */
 
-function init() {
-    particles = [];
-    for(let i=0; i<80; i++) particles.push(new Star());
-    
-    window.addEventListener('keydown', e => {
-        if(keys.hasOwnProperty(e.code)) keys[e.code] = true;
-        
-        // 3秒待機後のリスタート処理
-        if (gameState === 'WAITING' && e.code === 'Space') {
-            resetGame();
-        }
-        // 初回スタート
-        if (gameState === 'START' && e.code === 'Space') {
-            resetGame();
-        }
-    });
-    window.addEventListener('keyup', e => {
-        if(keys.hasOwnProperty(e.code)) keys[e.code] = false;
-    });
-
-    requestAnimationFrame(gameLoop);
-}
-
 function resetGame() {
-    player.x = 300; player.y = 700;
-    player.bullets = [];
-    player.shield = 0;
-    player.invincible = 0;
-    
-    enemies = [];
-    enemyBullets = [];
-    powerUps = [];
-    
-    score = 0;
-    difficulty = 1;
-    frames = 0;
-    
-    updateUI();
+    player = new Player();
+    enemies = []; enemyBullets = []; playerBullets = [];
+    items = []; particles = [];
+    score = 0; frames = 0; difficulty = 1;
     gameState = 'PLAYING';
+    updateUI();
 }
 
 function updateUI() {
-    scoreEl.innerText = score;
-    // シールド表示を記号で
-    shieldEl.innerText = "🛡️".repeat(player.shield) || "NONE";
+    document.getElementById('score').innerText = score.toString().padStart(6, '0');
+    document.getElementById('hi-score').innerText = hiScore.toString().padStart(6, '0');
+    document.getElementById('shield-count').innerText = "🛡️".repeat(player.shield) || "NONE";
+    document.getElementById('power-level').innerText = "Lv." + player.power;
+}
+
+function handleHit() {
+    if (player.shield > 0) {
+        player.shield--;
+        player.invincible = 90;
+        // 被弾エフェクト
+        for(let k=0; k<15; k++) particles.push(new Particle(player.x + 15, player.y + 15, '#0ff'));
+        updateUI();
+    } else {
+        if (score > hiScore) {
+            hiScore = score;
+            localStorage.setItem('astroFarmerHiScore', hiScore);
+        }
+        gameState = 'GAMEOVER';
+        setTimeout(() => gameState = 'WAITING', 2000);
+    }
 }
 
 function update() {
     if (gameState !== 'PLAYING') return;
 
     frames++;
+    difficulty = 1 + Math.floor(score / 2000); // 2000点ごとにレベルアップ
 
-    // 難易度調整：スコア500点ごとに難易度UP
-    difficulty = 1 + Math.floor(score / 500);
+    player.update();
+    
+    // 自機弾の更新
+    playerBullets.forEach((b, i) => {
+        b.update();
+        if (b.y < -20) playerBullets.splice(i, 1);
+    });
 
-    // 背景
-    particles.forEach(p => p.update());
-
-    // プレイヤー移動
-    if (keys.ArrowLeft && player.x > 0) player.x -= player.speed;
-    if (keys.ArrowRight && player.x < canvas.width - player.w) player.x += player.speed;
-    if (keys.ArrowUp && player.y > 0) player.y -= player.speed;
-    if (keys.ArrowDown && player.y < canvas.height - player.h) player.y += player.speed;
-
-    // 無敵時間の減少
-    if (player.invincible > 0) player.invincible--;
-
-    // プレイヤー発射（基本は2連装で固定）
-    if (keys.Space && frames - player.lastShotTime > player.shotDelay) {
-        player.lastShotTime = frames;
-        player.bullets.push({x: player.x, y: player.y, dx: 0, dy: -12});
-        player.bullets.push({x: player.x + player.w, y: player.y, dx: 0, dy: -12});
-    }
-
-    // プレイヤー弾更新
-    for (let i = player.bullets.length - 1; i >= 0; i--) {
-        let b = player.bullets[i];
-        b.y += b.dy;
-        if (b.y < 0) player.bullets.splice(i, 1);
-    }
-
-    // 敵出現ロジック（難易度が上がると出現間隔が短くなる）
-    // 最速で20フレームに1体
-    let spawnRate = Math.max(20, 60 - (difficulty * 2));
-    if (frames % spawnRate === 0) {
-        enemies.push(new Enemy());
-    }
+    // 敵の発生
+    const spawnRate = Math.max(8, 60 - (difficulty * 4));
+    if (frames % spawnRate === 0) enemies.push(new Enemy());
 
     // 敵の処理
-    for (let i = enemies.length - 1; i >= 0; i--) {
-        let e = enemies[i];
+    enemies.forEach((e, i) => {
         e.update();
-
-        // プレイヤー弾との当たり判定
-        for (let j = player.bullets.length - 1; j >= 0; j--) {
-            let b = player.bullets[j];
-            if (isColliding({x: b.x-2, y: b.y, w:4, h:10}, {x: e.x, y: e.y, w: e.w, h: e.h})) {
-                enemies.splice(i, 1);
-                player.bullets.splice(j, 1);
-                score += 10 + (difficulty * 2); // 難易度高いとスコアも高い
-                updateUI();
-
-                // シールドアイテムドロップ（確率は低め：10%）
-                // ただしシールドが0の時は少し出やすくする(20%)
-                let dropRate = player.shield === 0 ? 0.2 : 0.1;
-                if (Math.random() < dropRate) {
-                    powerUps.push(new ShieldItem(e.x, e.y));
-                }
-                break; 
-            }
-        }
+        if (e.y > canvas.height + 50) enemies.splice(i, 1);
         
-        // 画面外
-        if (e.y > canvas.height + 50) {
-            if (enemies[i]) enemies.splice(i, 1);
-        }
+        // 当たり判定 (対 自機弾)
+        playerBullets.forEach((pb, j) => {
+            if (isColliding(pb, e)) {
+                for(let k=0; k<8; k++) particles.push(new Particle(e.x+15, e.y+15, '#f44'));
+                enemies.splice(i, 1);
+                playerBullets.splice(j, 1);
+                score += 100;
+                if (Math.random() < 0.15) items.push(new Item(e.x, e.y));
+                updateUI();
+            }
+        });
 
-        // プレイヤーとの衝突
-        if (player.invincible === 0 && isColliding(player, {x: e.x, y: e.y, w: e.w, h: e.h})) {
-            handlePlayerHit();
-            // 敵も消滅
-            if (enemies[i]) enemies.splice(i, 1);
+        // 当たり判定 (対 自機本体)
+        if (player.invincible === 0 && isColliding(player, e)) {
+            handleHit();
+            enemies.splice(i, 1);
         }
-    }
+    });
 
     // 敵弾の処理
-    for (let i = enemyBullets.length - 1; i >= 0; i--) {
-        let eb = enemyBullets[i];
+    enemyBullets.forEach((eb, i) => {
         eb.update();
-        if (eb.y > canvas.height || eb.x < 0 || eb.x > canvas.width) {
-            enemyBullets.splice(i, 1);
-            continue;
-        }
-        // プレイヤー被弾判定
-        // 当たり判定を少し小さくして「避けやすく」する（かすり判定）
-        if (player.invincible === 0 && 
-            isCircleRectColliding(eb, {x: player.x + 5, y: player.y + 5, w: player.w - 10, h: player.h - 10})) {
-            handlePlayerHit();
+        if (eb.y > canvas.height || eb.x < 0 || eb.x > canvas.width) enemyBullets.splice(i, 1);
+        if (player.invincible === 0 && isCircleRectColliding(eb, player)) {
+            handleHit();
             enemyBullets.splice(i, 1);
         }
-    }
+    });
 
-    // アイテム取得処理
-    for (let i = powerUps.length - 1; i >= 0; i--) {
-        let p = powerUps[i];
-        p.update();
-        if (isColliding(player, p)) {
-            if (player.shield < player.maxShield) {
-                player.shield++;
-                score += 500;
-            } else {
-                score += 1000; // カンスト時はスコアボーナス
-            }
+    // アイテム回収
+    items.forEach((it, i) => {
+        it.update();
+        if (isColliding(player, it)) {
+            if (it.type === 'S' && player.shield < CONFIG.MAX_SHIELD) player.shield++;
+            else if (it.type === 'P' && player.power < CONFIG.MAX_POWER) player.power++;
+            else score += 1000;
+            items.splice(i, 1);
             updateUI();
-            powerUps.splice(i, 1);
-        } else if (p.y > canvas.height) {
-            powerUps.splice(i, 1);
         }
-    }
+    });
+
+    particles.forEach((p, i) => { p.update(); if (p.life <= 0) particles.splice(i, 1); });
 }
 
-// プレイヤー被弾時の処理
-function handlePlayerHit() {
-    if (player.shield > 0) {
-        player.shield--;
-        player.invincible = 90; // 1.5秒無敵
-        updateUI();
-        // 画面揺らし等のエフェクトを入れたいが今回は省略
-    } else {
-        triggerGameOver();
-    }
-}
-
-function triggerGameOver() {
-    gameState = 'GAMEOVER';
-    // 3秒後にリトライ可能状態にする
-    setTimeout(() => {
-        gameState = 'WAITING';
-    }, 3000);
-}
-
-// 矩形判定
-function isColliding(r1, r2) {
-    return (r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y);
-}
-// 円と矩形の判定（敵弾用）
-function isCircleRectColliding(circle, rect) {
-    let testX = circle.x;
-    let testY = circle.y;
-    if (circle.x < rect.x) testX = rect.x;
-    else if (circle.x > rect.x + rect.w) testX = rect.x + rect.w;
-    if (circle.y < rect.y) testY = rect.y;
-    else if (circle.y > rect.y + rect.h) testY = rect.y + rect.h;
-    
-    let distX = circle.x - testX;
-    let distY = circle.y - testY;
-    return (distX * distX + distY * distY) <= (circle.r * circle.r);
-}
+/* =========================================
+   4. 描画・演出
+   ========================================= */
 
 function draw() {
-    // 画面クリア
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 背景
-    particles.forEach(p => p.draw());
+    // 背景の星
+    ctx.fillStyle = '#444';
+    if (!stars) {
+        stars = Array.from({length: 50}, () => ({x:Math.random()*canvas.width, y:Math.random()*canvas.height, s:Math.random()*2}));
+    }
+    stars.forEach(s => {
+        s.y += 1.5; if (s.y > canvas.height) s.y = 0;
+        ctx.fillRect(s.x, s.y, s.s, s.s);
+    });
 
     if (gameState === 'START') {
-        ctx.fillStyle = 'white';
-        ctx.textAlign = 'center';
-        ctx.font = '50px Courier New';
-        ctx.fillText("ASTRO FARMER", canvas.width/2, canvas.height/2 - 40);
-        ctx.font = '20px Courier New';
-        ctx.fillText("Collect Shields [S] to Survive", canvas.width/2, canvas.height/2 + 20);
-        ctx.fillText("Press SPACE to Start", canvas.width/2, canvas.height/2 + 60);
-        return;
-    }
+        drawOverlay("ASTRO FARMER v5", "PRESS SPACE TO START");
+        if (keys.Space) resetGame();
+    } else {
+        player.draw();
+        playerBullets.forEach(b => b.draw());
+        enemies.forEach(e => e.draw());
+        enemyBullets.forEach(eb => eb.draw());
+        items.forEach(it => it.draw());
+        particles.forEach(p => p.draw());
 
-    // プレイヤー描画
-    if (player.invincible % 10 < 5) { // 無敵時は点滅
-        ctx.fillStyle = player.color;
-        // トラクター（長方形）
-        ctx.fillRect(player.x, player.y, player.w, player.h);
-
-        // シールド展開エフェクト
-        if (player.shield > 0) {
-            ctx.strokeStyle = `rgba(0, 255, 255, ${0.3 + (player.shield * 0.2)})`;
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(player.x + player.w/2, player.y + player.h/2, 40, 0, Math.PI*2);
-            ctx.stroke();
-        }
-    }
-
-    // 弾
-    ctx.fillStyle = 'yellow';
-    player.bullets.forEach(b => ctx.fillRect(b.x - 2, b.y, 4, 12));
-
-    // 敵・アイテム
-    enemies.forEach(e => e.draw());
-    powerUps.forEach(p => p.draw());
-    enemyBullets.forEach(eb => eb.draw());
-
-    // ゲームオーバー画面
-    if (gameState === 'GAMEOVER' || gameState === 'WAITING') {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.fillStyle = 'red';
-        ctx.textAlign = 'center';
-        ctx.font = '60px Courier New';
-        ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 20);
-        
-        ctx.fillStyle = 'white';
-        ctx.font = '30px Courier New';
-        ctx.fillText("Final Score: " + score, canvas.width/2, canvas.height/2 + 50);
-
-        if (gameState === 'WAITING') {
-            ctx.fillStyle = '#00ffff'; // シアン色で誘導
-            ctx.font = '20px Courier New';
-            ctx.fillText("> Press SPACE to Retry <", canvas.width/2, canvas.height/2 + 100);
-        } else {
-            ctx.fillStyle = 'gray';
-            ctx.font = '16px Courier New';
-            ctx.fillText("Wait...", canvas.width/2, canvas.height/2 + 100);
+        if (gameState === 'GAMEOVER' || gameState === 'WAITING') {
+            drawOverlay("GAME OVER", `FINAL SCORE: ${score.toString().padStart(6, '0')}`, (gameState === 'WAITING'));
+            if (gameState === 'WAITING' && keys.Space) resetGame();
         }
     }
 }
 
-function gameLoop() {
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
+function drawOverlay(t1, t2, showRetry = true) {
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.font = '28px "Courier New"';
+    ctx.fillText(t1, canvas.width / 2, canvas.height / 2 - 20);
+    ctx.fillStyle = '#0ff';
+    ctx.font = '18px "Courier New"';
+    ctx.fillText(t2, canvas.width / 2, canvas.height / 2 + 30);
+    
+    if (showRetry) {
+        ctx.fillStyle = '#aaa';
+        ctx.font = '14px "Courier New"';
+        ctx.fillText("PRESS SPACE TO RETRY", canvas.width / 2, canvas.height / 2 + 80);
+    }
 }
 
-init();
+// 判定ユーティリティ
+function isColliding(a, b) {
+    // 両方のオブジェクトに x, y, w, h が存在することを前提とする
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+function isCircleRectColliding(c, r) {
+    let x = Math.max(r.x, Math.min(c.x, r.x + r.w));
+    let y = Math.max(r.y, Math.min(c.y, r.y + r.h));
+    return ((x - c.x)**2 + (y - c.y)**2) < c.r**2;
+}
+
+function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+document.getElementById('hi-score').innerText = hiScore.toString().padStart(6, '0');
+gameLoop();
 
 </script>
 </body>
