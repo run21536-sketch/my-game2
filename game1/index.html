@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ジャンプゲーム</title>
     <style>
+        /* 1. 背景を白に変更 */
         body {
             margin: 0;
             padding: 20px;
@@ -13,30 +14,31 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background: #1a1a1a;
+            background: #ffffff; 
             font-family: Arial, sans-serif;
+            color: #333;
         }
         canvas {
             border: 3px solid #333;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
             background: #4682b4;
         }
         .info {
-            color: white;
             margin-top: 20px;
             text-align: center;
         }
         .controls {
-            color: #aaa;
+            color: #555;
             margin-top: 10px;
-            font-size: 14px;
+            font-size: 18px;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas" width="800" height="400"></canvas>
     <div class="info">
-        <div class="controls">操作: クリックまたはスペースキーでジャンプ (二段ジャンプ可能)</div>
+        <div class="controls">スペースorクリックでジャンプ</div>
     </div>
 
     <script>
@@ -45,7 +47,7 @@
         
         const WIDTH = 800;
         const HEIGHT = 400;
-        const FPS = 60;
+        const GROUND_LINE = HEIGHT - 100; // 地面の基準線
         
         // 色定義
         const WHITE = '#FFFFFF';
@@ -54,39 +56,36 @@
         const GREEN = '#00FF00';
         const GRAY = '#808080';
         
-        // 画像読み込み
+        // 画像オブジェクトの準備
         const images = {
-            player: "asset/torakuta-.png",
-            cloud: "asset/pixel_kumo.png",
-            block: "asset/pixel-art_pro.png",
-            hole: "asset/pixel_usi.png"
+            player: new Image(),
+            cloud: new Image(),
+            block: new Image(),
+            hole: new Image()
         };
-        
-        // プレイヤークラス
+        images.player.src = 'asset/torakuta-.png';
+        images.cloud.src = 'asset/pixel_kumo.png';
+        images.block.src = 'asset/pixel-art_pro.png'; // blockはine
+        images.hole.src = 'asset/pixel_usi.png';      // holeはusi
+
         class Player {
             constructor() {
                 this.width = 60;
                 this.height = 50;
                 this.x = 100;
-                this.y = HEIGHT - 150;
+                this.y = GROUND_LINE - this.height;
                 this.velocityY = 0;
                 this.jumpPower = -15;
                 this.gravity = 0.8;
-                this.isJumping = false;
-                this.groundY = HEIGHT - 150;
+                this.groundY = GROUND_LINE - this.height;
                 this.jumpCount = 0;
                 this.maxJumps = 2;
             }
             
             jump() {
                 if (this.jumpCount < this.maxJumps) {
-                    if (this.jumpCount === 0) {
-                        this.velocityY = this.jumpPower;
-                    } else {
-                        this.velocityY = this.jumpPower / 2;
-                    }
+                    this.velocityY = (this.jumpCount === 0) ? this.jumpPower : this.jumpPower / 1.5;
                     this.jumpCount++;
-                    this.isJumping = true;
                 }
             }
             
@@ -97,13 +96,12 @@
                 if (this.y >= this.groundY) {
                     this.y = this.groundY;
                     this.velocityY = 0;
-                    this.isJumping = false;
                     this.jumpCount = 0;
                 }
             }
             
             draw(ctx) {
-                if (images.player && images.player.complete) {
+                if (images.player.complete) {
                     ctx.drawImage(images.player, this.x, this.y, this.width, this.height);
                 } else {
                     ctx.fillStyle = GREEN;
@@ -112,87 +110,58 @@
             }
         }
         
-        // 雲クラス
+        class Obstacle {
+            constructor(x, obsType = 'block') {
+                this.type = obsType;
+                this.width = (this.type === 'block') ? 90 : 80;
+                this.height = (this.type === 'block') ? (Math.floor(Math.random() * 40) + 40) : 60;
+                this.x = x;
+                
+                // 【修正】holeもblockと同じく地面(GROUND_LINE)を基準にしたy座標にする
+                this.y = GROUND_LINE - this.height;
+                
+                this.speed = 5;
+            }
+            
+            update() {
+                this.x -= this.speed;
+            }
+            
+            draw(ctx) {
+                let img = (this.type === 'block') ? images.block : images.hole;
+                if (img.complete) {
+                    ctx.drawImage(img, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = (this.type === 'block') ? RED : BLACK;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+            
+            isOffScreen() { return this.x + this.width < 0; }
+        }
+
         class Cloud {
             constructor() {
                 this.width = Math.floor(Math.random() * 70) + 80;
                 this.height = Math.floor(Math.random() * 40) + 50;
                 this.x = WIDTH + Math.floor(Math.random() * 200);
-                this.y = Math.floor(Math.random() * 180) + 20;
-                this.speed = 5;
+                this.y = Math.floor(Math.random() * 150) + 20;
+                this.speed = 2;
             }
-            
-            update() {
-                this.x -= this.speed;
-            }
-            
+            update() { this.x -= this.speed; }
             draw(ctx) {
-                if (images.cloud && images.cloud.complete) {
+                if (images.cloud.complete) {
                     ctx.drawImage(images.cloud, this.x, this.y, this.width, this.height);
                 } else {
                     ctx.fillStyle = WHITE;
                     ctx.beginPath();
-                    ctx.ellipse(this.x + this.width/2, this.y + this.height/2, 
-                               this.width/2, this.height/2, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.ellipse(this.x + this.width/2 + 10, this.y + this.height/2 - 10, 
-                               this.width/3, this.height/3, 0, 0, Math.PI * 2);
+                    ctx.ellipse(this.x + this.width/2, this.y + this.height/2, this.width/2, this.height/2, 0, 0, Math.PI * 2);
                     ctx.fill();
                 }
             }
-            
-            isOffScreen() {
-                return this.x + this.width < 0;
-            }
+            isOffScreen() { return this.x + this.width < 0; }
         }
-        
-        // 障害物クラス
-        class Obstacle {
-            constructor(x, obsType = 'block') {
-                this.type = obsType;
-                if (this.type === 'block') {
-                    this.width = 90;
-                    this.height = Math.floor(Math.random() * 40) + 40;
-                    this.x = x;
-                    this.y = HEIGHT - 100 - this.height;
-                } else {
-                    this.width = Math.floor(Math.random() * 30) + 80;
-                    this.height = 60;
-                    this.x = x;
-                    this.y = HEIGHT - 150;
-                }
-                this.speed = 5;
-            }
-            
-            update() {
-                this.x -= this.speed;
-            }
-            
-            draw(ctx) {
-                if (this.type === 'block') {
-                    if (images.block && images.block.complete) {
-                        ctx.drawImage(images.block, this.x, this.y, this.width, this.height);
-                    } else {
-                        ctx.fillStyle = RED;
-                        ctx.fillRect(this.x, this.y, this.width, this.height);
-                    }
-                } else {
-                    if (images.hole && images.hole.complete) {
-                        ctx.drawImage(images.hole, this.x, this.y, this.width, this.height);
-                    } else {
-                        ctx.fillStyle = BLACK;
-                        ctx.fillRect(this.x, this.y, this.width, this.height);
-                    }
-                }
-            }
-            
-            isOffScreen() {
-                return this.x + this.width < 0;
-            }
-        }
-        
-        // ゲームクラス
+
         class Game {
             constructor() {
                 this.player = new Player();
@@ -201,24 +170,16 @@
                 this.score = 0;
                 this.distance = 0;
                 this.gameOver = false;
+                this.gameOverTime = 0;
                 this.obstacleTimer = 0;
-                this.obstacleInterval = 90;
-                this.difficultyTimer = 0;
                 this.cloudTimer = 0;
-                this.cloudInterval = Math.floor(Math.random() * 90) + 60;
                 
-                // 初期雲を配置
+                // 初期状態の雲
                 for (let i = 0; i < 3; i++) {
-                    const cloud = new Cloud();
-                    cloud.x = Math.random() * WIDTH;
-                    this.clouds.push(cloud);
+                    const c = new Cloud();
+                    c.x = Math.random() * WIDTH;
+                    this.clouds.push(c);
                 }
-            }
-            
-            createObstacle() {
-                const types = ['block', 'block', 'hole'];
-                const obsType = types[Math.floor(Math.random() * types.length)];
-                return new Obstacle(WIDTH, obsType);
             }
             
             update() {
@@ -226,232 +187,118 @@
                 
                 this.player.update();
                 
-                // 雲の更新
-                this.cloudTimer++;
-                if (this.cloudTimer > this.cloudInterval) {
-                    this.clouds.push(new Cloud());
-                    this.cloudTimer = 0;
-                    this.cloudInterval = Math.floor(Math.random() * 90) + 60;
-                }
-                
-                for (let i = this.clouds.length - 1; i >= 0; i--) {
-                    this.clouds[i].update();
-                    if (this.clouds[i].isOffScreen()) {
-                        this.clouds.splice(i, 1);
-                    }
-                }
-                
-                // スコアと距離の更新
                 this.score++;
                 this.distance = Math.floor(this.score / 10);
                 
-                // 難易度調整
-                this.difficultyTimer++;
-                if (this.difficultyTimer > 300) {
-                    this.obstacleInterval = Math.max(30, this.obstacleInterval - 5);
-                    this.difficultyTimer = 0;
-                }
+                // 【修正】進むにつれ障害物の出現間隔を短くする（密度を上げる）
+                // 距離に応じて、間隔が90から徐々に25まで縮まります
+                let currentInterval = Math.max(25, 90 - Math.floor(this.distance / 5));
                 
-                // 障害物生成
                 this.obstacleTimer++;
-                if (this.obstacleTimer > this.obstacleInterval) {
-                    this.obstacles.push(this.createObstacle());
+                if (this.obstacleTimer > currentInterval) {
+                    const type = Math.random() > 0.4 ? 'block' : 'hole';
+                    this.obstacles.push(new Obstacle(WIDTH, type));
                     this.obstacleTimer = 0;
                 }
                 
-                // 障害物更新
                 for (let i = this.obstacles.length - 1; i >= 0; i--) {
                     this.obstacles[i].update();
                     if (this.obstacles[i].isOffScreen()) {
                         this.obstacles.splice(i, 1);
                     } else if (this.checkCollision(this.obstacles[i])) {
                         this.gameOver = true;
+                        this.gameOverTime = Date.now();
                     }
                 }
                 
-                // 速度アップ
-                if (this.score % 500 === 0 && this.score > 0) {
-                    for (const obstacle of this.obstacles) {
-                        obstacle.speed = Math.min(8, obstacle.speed + 0.1);
-                    }
+                // 雲の更新
+                if (Math.random() < 0.01) this.clouds.push(new Cloud());
+                for (let i = this.clouds.length - 1; i >= 0; i--) {
+                    this.clouds[i].update();
+                    if (this.clouds[i].isOffScreen()) this.clouds.splice(i, 1);
                 }
             }
             
-            checkCollision(obstacle) {
-                const playerRect = {
-                    x: this.player.x,
-                    y: this.player.y,
-                    width: this.player.width,
-                    height: this.player.height
-                };
-                
-                if (obstacle.type === 'block') {
-                    const obstacleRect = {
-                        x: obstacle.x,
-                        y: obstacle.y,
-                        width: obstacle.width,
-                        height: obstacle.height
-                    };
-                    
-                    return playerRect.x < obstacleRect.x + obstacleRect.width &&
-                           playerRect.x + playerRect.width > obstacleRect.x &&
-                           playerRect.y < obstacleRect.y + obstacleRect.height &&
-                           playerRect.y + playerRect.height > obstacleRect.y;
-                } else {
-                    const playerBottomCenterX = this.player.x + this.player.width / 2;
-                    const playerBottomY = this.player.y + this.player.height;
-                    
-                    if (playerBottomY >= this.player.groundY) {
-                        if (obstacle.x < playerBottomCenterX && 
-                            playerBottomCenterX < obstacle.x + obstacle.width) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-            
-            getBackgroundColor() {
-                const cycleDistance = this.distance % 400;
-                const dayBlue = [70, 130, 180];
-                const sunsetOrange = [255, 140, 70];
-                const nightBlue = [20, 24, 82];
-                
-                let r, g, b;
-                
-                if (cycleDistance < 200) {
-                    const ratio = cycleDistance / 200;
-                    r = Math.floor(dayBlue[0] + (sunsetOrange[0] - dayBlue[0]) * ratio);
-                    g = Math.floor(dayBlue[1] + (sunsetOrange[1] - dayBlue[1]) * ratio);
-                    b = Math.floor(dayBlue[2] + (sunsetOrange[2] - dayBlue[2]) * ratio);
-                } else {
-                    const progress = cycleDistance - 200;
-                    if (progress < 100) {
-                        const ratio = progress / 100;
-                        r = Math.floor(sunsetOrange[0] + (nightBlue[0] - sunsetOrange[0]) * ratio);
-                        g = Math.floor(sunsetOrange[1] + (nightBlue[1] - sunsetOrange[1]) * ratio);
-                        b = Math.floor(sunsetOrange[2] + (nightBlue[2] - sunsetOrange[2]) * ratio);
-                    } else {
-                        const ratio = (progress - 100) / 100;
-                        r = Math.floor(nightBlue[0] + (dayBlue[0] - nightBlue[0]) * ratio);
-                        g = Math.floor(nightBlue[1] + (dayBlue[1] - nightBlue[1]) * ratio);
-                        b = Math.floor(nightBlue[2] + (dayBlue[2] - nightBlue[2]) * ratio);
-                    }
-                }
-                
-                return `rgb(${r}, ${g}, ${b})`;
+            checkCollision(obs) {
+                // 当たり判定を少し小さくして遊びやすく調整
+                return this.player.x < obs.x + obs.width - 10 &&
+                       this.player.x + this.player.width > obs.x + 10 &&
+                       this.player.y < obs.y + obs.height - 5 &&
+                       this.player.y + this.player.height > obs.y + 5;
             }
             
             draw(ctx) {
-                // 背景
-                ctx.fillStyle = this.getBackgroundColor();
+                // 背景の空
+                ctx.fillStyle = '#4682b4';
                 ctx.fillRect(0, 0, WIDTH, HEIGHT);
                 
-                // 雲
-                for (const cloud of this.clouds) {
-                    cloud.draw(ctx);
-                }
+                for (const c of this.clouds) c.draw(ctx);
                 
                 // 地面
                 ctx.fillStyle = GRAY;
-                ctx.fillRect(0, HEIGHT - 100, WIDTH, 100);
+                ctx.fillRect(0, GROUND_LINE, WIDTH, 100);
                 
-                // プレイヤー
                 this.player.draw(ctx);
+                for (const obs of this.obstacles) obs.draw(ctx);
                 
-                // 障害物
-                for (const obstacle of this.obstacles) {
-                    obstacle.draw(ctx);
-                }
-                
-                // 進行メーター
-                this.drawProgressMeter(ctx);
-                
-                // ゲームオーバー表示
-                if (this.gameOver) {
-                    this.drawGameOver(ctx);
-                }
-            }
-            
-            drawProgressMeter(ctx) {
-                const meterX = 10, meterY = 10;
-                const meterWidth = 200, meterHeight = 30;
-                
-                ctx.strokeStyle = WHITE;
-                ctx.lineWidth = 2;
-                ctx.strokeRect(meterX, meterY, meterWidth, meterHeight);
-                
-                const progress = Math.min(this.distance % 100, 100);
-                const fillWidth = Math.floor((meterWidth - 4) * (progress / 100));
-                ctx.fillStyle = GREEN;
-                ctx.fillRect(meterX + 2, meterY + 2, fillWidth, meterHeight - 4);
-                
+                // スコア表示
                 ctx.fillStyle = WHITE;
-                ctx.font = '24px Arial';
-                ctx.fillText(`Distance: ${this.distance}m`, meterX, meterY + meterHeight + 25);
+                ctx.font = 'bold 24px Arial';
+                ctx.fillText(`距離: ${this.distance}m`, 20, 40);
+                
+                if (this.gameOver) this.drawGameOver(ctx);
             }
             
             drawGameOver(ctx) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
                 ctx.fillRect(0, 0, WIDTH, HEIGHT);
                 
                 ctx.fillStyle = WHITE;
-                ctx.font = 'bold 72px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText('GAME OVER', WIDTH / 2, HEIGHT / 2 - 30);
+                ctx.font = 'bold 72px Arial';
+                ctx.fillText('GAME OVER', WIDTH / 2, HEIGHT / 2 - 20);
                 
-                ctx.font = '36px Arial';
-                ctx.fillText(`Distance: ${this.distance}m`, WIDTH / 2, HEIGHT / 2 + 40);
-                ctx.fillText('Click to Restart', WIDTH / 2, HEIGHT / 2 + 90);
+                ctx.font = '30px Arial';
+                ctx.fillText(`Score: ${this.distance}m`, WIDTH / 2, HEIGHT / 2 + 40);
                 
+                const waitTime = Date.now() - this.gameOverTime;
+                if (waitTime > 2000) {
+                    ctx.fillStyle = GREEN;
+                    ctx.fillText('クリックorスペース', WIDTH / 2, HEIGHT / 2 + 100);
+                } else {
+                    ctx.fillStyle = '#aaa';
+                    ctx.font = '20px Arial';
+                    ctx.fillText(`Wait ${Math.ceil((2000 - waitTime)/1000)}s...`, WIDTH / 2, HEIGHT / 2 + 100);
+                }
                 ctx.textAlign = 'left';
             }
         }
         
-        // 画像読み込み（オプション）
-        images.player = new Image();
-        images.player.src = 'asset/torakuta-.png';
-        
-        images.cloud = new Image();
-        images.cloud.src = 'asset/pixel_kumo.png';
-        
-        images.block = new Image();
-        images.block.src = 'asset/pixel_usi.png';
-        
-        images.hole = new Image();
-        images.hole.src = 'asset/pixel-art_pro.png';
-        
-        
-        // ゲーム初期化
         let game = new Game();
         
-        // イベントリスナー
-        canvas.addEventListener('click', () => {
+        function handleInput() {
             if (game.gameOver) {
-                game = new Game();
+                if (Date.now() - game.gameOverTime > 2000) {
+                    game = new Game();
+                }
             } else {
                 game.player.jump();
             }
-        });
+        }
         
+        canvas.addEventListener('click', handleInput);
         document.addEventListener('keydown', (e) => {
             if (e.key === ' ' || e.key === 'Spacebar') {
                 e.preventDefault();
-                if (game.gameOver) {
-                    game = new Game();
-                } else {
-                    game.player.jump();
-                }
+                handleInput();
             }
         });
         
-        // ゲームループ
         function gameLoop() {
             game.update();
             game.draw(ctx);
             requestAnimationFrame(gameLoop);
         }
-        
         gameLoop();
     </script>
 </body>
